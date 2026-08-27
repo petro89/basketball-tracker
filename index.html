@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basketball Tracker Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; }
+        
+        body { min-height: 100vh; background: #06060e; display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow: hidden; }
+
+        .orb { position: absolute; border-radius: 50%; filter: blur(140px); opacity: 0.6; z-index: -1; }
+        .orb-1 { width: 500px; height: 500px; background: #ff9500; top: -150px; left: 10%; animation: pulse1 8s infinite alternate; }
+        .orb-2 { width: 450px; height: 450px; background: #8a2be2; bottom: -150px; right: 15%; animation: pulse2 10s infinite alternate; }
+        .orb-3 { width: 300px; height: 300px; background: #00c2ff; top: 30%; left: 65%; animation: pulse1 12s infinite alternate-reverse; }
+
+        @keyframes pulse1 { 0% { transform: scale(1) rotate(0deg); } 100% { transform: scale(1.3) rotate(45deg); } }
+        @keyframes pulse2 { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.4); opacity: 0.9; } }
+
+        .card {
+            position: relative;
+            background: linear-gradient(145deg, rgba(25, 25, 35, 0.95), rgba(10, 10, 20, 0.98));
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 36px;
+            padding: 35px 30px;
+            max-width: 580px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2);
+            backdrop-filter: blur(25px);
+            animation: popIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent);
+            border-radius: 36px 36px 0 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes popIn { 0% { opacity: 0; transform: translateY(50px) scale(0.9); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #ff9500, #ffd000, #ff5e00, #ff9500);
+            background-size: 300% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 5s linear infinite;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 15px rgba(255, 149, 0, 0.3));
+        }
+        @keyframes shine { to { background-position: 300% center; } }
+
+        .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 12px; margin-bottom: 20px; letter-spacing: 1px; }
+
+        .tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 50px;
+            padding: 5px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            border-radius: 40px;
+            transition: all 0.3s;
+            font-family: inherit;
+            position: relative;
+            z-index: 30;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #ff9500, #ff5e00);
+            color: white;
+            box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4);
+        }
+
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+
+        .video-container { width: 100%; height: 300px; border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 20px; position: relative; border: 2px solid rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        video, canvas { width: 100%; height: 100%; object-fit: cover; }
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; }
+
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 10px; }
+        
+        .btn-group { display: flex; justify-content: center; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; }
+        
+        button {
+            position: relative;
+            padding: 14px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            border-radius: 18px;
+            cursor: pointer;
+            transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+            color: white;
+            font-family: inherit;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            z-index: 20;
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 60%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transform: skewX(-20deg);
+            transition: 0.6s;
+            pointer-events: none;
+        }
+        button:hover::after { left: 150%; }
+
+        button:active { transform: scale(0.95); }
+        
+        button:hover {
+            transform: scale(1.03); 
+            filter: brightness(1.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 25px var(--glow-color, rgba(255,255,255,0.2));
+        }
+
+        #startAiBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
+        #uploadBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
+        #jumpStandBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
+        #jumpGoBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
+        #uploadJumpBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
+
+        .btn-hit { --glow-color: rgba(40, 167, 69, 0.6); background: linear-gradient(135deg, #28a745, #1e7e34); }
+        .btn-miss { --glow-color: rgba(220, 53, 69, 0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
+
+        .save-btn, .log-btn { --glow-color: rgba(40, 167, 69, 0.6); background: linear-gradient(135deg, #28a745, #1e7e34); width: 100%; margin-top: 15px; }
+
+        .basketball-icon { width: 26px; height: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); transition: transform 0.4s; }
+        .btn-hit:hover .basketball-icon { transform: rotate(360deg) scale(1.2); }
+        .miss-icon { width: 18px; height: 18px; fill: white; }
+
+        #aiStatus { font-size: 12px; color: #aaa; margin-bottom: 20px; text-align: left; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border-left: 4px solid #ff9500; }
+        #aiStatusJump { font-size: 12px; color: #aaa; margin-bottom: 20px; text-align: left; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border-left: 4px solid #ff9500; }
+        
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; margin-top: 10px; }
+        .stat-box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 20px 10px; position: relative; overflow: hidden; }
+        .stat-box::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, #ff9500, transparent); }
+        .stat-box h2 { font-size: 40px; font-weight: 900; text-shadow: 0 0 20px rgba(255,255,255,0.2); line-height: 1; }
+        .stat-box span { font-size: 10px; color: rgba(255, 255, 255, 0.6); display: block; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+        #resetBtn { background: transparent; border: 2px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.8); width: 100%; margin-top: 10px; }
+        #resetBtn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); color: white; filter: none; box-shadow: none; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            font-family: inherit;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        input::-webkit-inner-spin-button, 
+        input::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+
+        input:focus {
+            border-color: #ff9500;
+            box-shadow: 0 0 15px rgba(255, 149, 0, 0.3);
+        }
+
+        .chart-container { height: 300px; background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 20px; margin-bottom: 20px; position: relative; }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; overflow-y: auto; }
+            .card { padding: 20px 15px; border-radius: 24px; }
+            h1 { font-size: 22px; }
+            .tab-btn { font-size: 11px; padding: 10px; }
+            .video-container { height: 220px; }
+            .btn-group { gap: 8px; margin-bottom: 20px; }
+            button { padding: 12px 15px; font-size: 14px; }
+            .stats { gap: 8px; }
+            .stat-box { padding: 15px 5px; }
+            .stat-box h2 { font-size: 28px; }
+            .chart-container { height: 250px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="card">
+        <h1>Basketball Tracker Pro</h1>
+        <p class="subtitle">Твой комплексный спортивный помощник</p>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('shooting')">Счётчик</button>
+            <button class="tab-btn" onclick="switchTab('jump')">Прыжок</button>
+            <button class="tab-btn" onclick="switchTab('profile')">Профиль</button>
+            <button class="tab-btn" onclick="switchTab('history')">История</button>
+        </div>
+
+        <!-- ВКЛАДКА 1: СЧЁТЧИК -->
+        <div id="shooting-section" class="content-section active">
+            <div class="video-container">
+                <video id="cameraFeed" autoplay playsinline></video>
+                <canvas id="overlayCanvas"></canvas>
+            </div>
+            
+            <input type="file" id="videoUpload" accept="video/*" style="display: none;">
+
+            <div class="input-group">
+                <label>Высота кольца (в см, обычно 305)</label>
+                <input type="number" id="hoopHeight" placeholder="305">
+                <label style="margin-top: 10px;">Твоя досягаемость стоя (в см, например 231)</label>
+                <input type="number" id="reachHeight" placeholder="231">
+            </div>
+
+            <div class="btn-group">
+                <button id="startAiBtn">Загрузить ИИ и камеру</button>
+                <button id="uploadBtn">Загрузить видео</button>
+            </div>
+
+            <div id="aiStatus">Статус: Введи данные и включи камеру.</div>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <h2 id="hits">0</h2>
+                    <span>Попадания</span>
+                </div>
+                <div class="stat-box">
+                    <h2 id="total">0</h2>
+                    <span>Всего</span>
+                </div>
+                <div class="stat-box">
+                    <h2 id="percent">0%</h2>
+                    <span>Точность</span>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 15px;">
+                <button class="btn-hit" id="hitBtn">
+                    <svg class="basketball-icon" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" fill="#f68a1e" stroke="#8c4308" stroke-width="1.5"/>
+                        <path d="M12 2 V22" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M2 12 H22" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M4.5 5 C 8 8, 8 16, 4.5 19" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/>
+                        <path d="M19.5 5 C 16 8, 16 16, 19.5 19" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/>
+                        <circle cx="9" cy="9" r="2.5" fill="rgba(255,255,255,0.2)"/>
+                    </svg>
+                    Попал
+                </button>
+                <button class="btn-miss" id="missBtn">
+                    <svg class="miss-icon" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                    Мимо
+                </button>
+            </div>
+
+            <button id="resetBtn">Сбросить всё</button>
+            <button class="log-btn" onclick="logShootingData()">Записать сегодняшний % в историю</button>
+        </div>
+
+        <!-- ВКЛАДКА 2: ПРЫЖОК -->
+        <div id="jump-section" class="content-section">
+            <div class="video-container">
+                <video id="jumpFeed" autoplay playsinline></video>
+                <canvas id="jumpCanvas"></canvas>
+            </div>
+            
+            <input type="file" id="jumpUpload" accept="video/*" style="display: none;">
+
+            <div class="input-group">
+                <label>Твой точный рост (в см)</label>
+                <input type="number" id="userHeight" placeholder="180">
+            </div>
+
+            <div class="btn-group">
+                <button id="jumpStandBtn" disabled>1. Я стою (калибровка)</button>
+                <button id="jumpGoBtn" disabled>2. Прыгай!</button>
+                <button id="uploadJumpBtn">Загрузить видео</button>
+            </div>
+
+            <div id="aiStatusJump">Статус: Введи рост и включи камеру.</div>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <h2 id="jumpResult">0</h2>
+                    <span>Прыжок (в см)</span>
+                </div>
+            </div>
+
+            <button class="log-btn" onclick="logJumpData()">Записать прыжок в историю</button>
+        </div>
+
+        <!-- ВКЛАДКА 3: ПРОФИЛЬ -->
+        <div id="profile-section" class="content-section">
+            <div class="input-group">
+                <label>Рост (в см)</label>
+                <input type="number" id="profileHeight" placeholder="180">
+            </div>
+            <div class="input-group">
+                <label>Вес (в кг)</label>
+                <input type="number" id="profileWeight" placeholder="75">
+            </div>
+            <div class="input-group">
+                <label>Максимальная точка касания стоя (в см)</label>
+                <input type="number" id="profileReach" placeholder="231">
+            </div>
+            <div class="input-group">
+                <label>Актуальный прыжок (в см)</label>
+                <input type="number" id="profileJump" placeholder="70">
+            </div>
+
+            <button class="save-btn" onclick="saveProfile()">Сохранить мои данные</button>
+            <div id="profileStatus" style="font-size: 12px; color: #ff9500; margin-top: 10px;"></div>
+        </div>
+
+        <!-- ВКЛАДКА 4: ИСТОРИЯ -->
+        <div id="history-section" class="content-section">
+            <div class="chart-container">
+                <canvas id="trendChart"></canvas>
+            </div>
+            <div id="historyList" style="font-size: 14px; color: rgba(255,255,255,0.6); text-align: left; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // Навигация по вкладкам
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            
+            if (tab === 'shooting') {
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('shooting-section').classList.add('active');
+            } else if (tab === 'jump') {
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('jump-section').classList.add('active');
+            } else if (tab === 'profile') {
+                document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
+                document.getElementById('profile-section').classList.add('active');
+                loadProfile();
+            } else if (tab === 'history') {
+                document.querySelector('.tab-btn:nth-child(4)').classList.add('active');
+                document.getElementById('history-section').classList.add('active');
+                renderHistory();
+            }
+        }
+
+        // ЛОГИКА ПРОФИЛЯ
+        function saveProfile() {
+            const height = document.getElementById('profileHeight').value;
+            const weight = document.getElementById('profileWeight').value;
+            const reach = document.getElementById('profileReach').value;
+            const jump = document.getElementById('profileJump').value;
+
+            localStorage.setItem('btp_height', height);
+            localStorage.setItem('btp_weight', weight);
+            localStorage.setItem('btp_reach', reach);
+            localStorage.setItem('btp_jump', jump);
+
+            addHistoryEntry('weight', weight);
+            addHistoryEntry('jump', jump);
+            addHistoryEntry('height', height);
+            addHistoryEntry('reach', reach);
+
+            document.getElementById('profileStatus').innerText = "Данные сохранены и добавлены в историю!";
+            setTimeout(() => document.getElementById('profileStatus').innerText = "", 2000);
+        }
+
+        // Улучшенная загрузка профиля
+        function loadProfile() {
+            const h = localStorage.getItem('btp_height') || '';
+            const w = localStorage.getItem('btp_weight') || '';
+            const r = localStorage.getItem('btp_reach') || '';
+            const j = localStorage.getItem('btp_jump') || '';
+            
+            document.getElementById('profileHeight').value = h;
+            document.getElementById('profileWeight').value = w;
+            document.getElementById('profileReach').value = r;
+            document.getElementById('profileJump').value = j;
+            
+            document.getElementById('userHeight').value = h;
+            document.getElementById('reachHeight').value = r;
+        }
+
+        // ЛОГИКА ИСТОРИИ
+        function getHistory() {
+            if (localStorage.getItem('btp_history')) {
+                return JSON.parse(localStorage.getItem('btp_history'));
+            }
+            return [];
+        }
+
+        function addHistoryEntry(type, value) {
+            const history = getHistory();
+            const today = new Date().toLocaleDateString('ru-RU');
+            
+            let lastEntry = history[history.length - 1];
+            if (!lastEntry || lastEntry.date !== today) {
+                lastEntry = { date: today, weight: null, jump: null, shooting: null, height: null, reach: null };
+                history.push(lastEntry);
+            }
+
+            if (type === 'weight') lastEntry.weight = value;
+            if (type === 'jump') lastEntry.jump = value;
+            if (type === 'shooting') lastEntry.shooting = value;
+            if (type === 'height') lastEntry.height = value;
+            if (type === 'reach') lastEntry.reach = value;
+
+            localStorage.setItem('btp_history', JSON.stringify(history));
+        }
+
+        function logShootingData() {
+            const pct = document.getElementById('percent').innerText;
+            addHistoryEntry('shooting', pct);
+            alert("Данные записаны в историю!");
+        }
+
+        function logJumpData() {
+            const jump = document.getElementById('jumpResult').innerText;
+            addHistoryEntry('jump', jump);
+            alert("Данные записаны в историю!");
+        }
+
+        // Рендер графика с измененными цветами
+        let myChart = null;
+        function renderHistory() {
+            const history = getHistory();
+            const ctx = document.getElementById('trendChart').getContext('2d');
+
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            const labels = history.map(e => e.date);
+            const weightData = history.map(e => e.weight);
+            const jumpData = history.map(e => e.jump);
+            const shootData = history.map(e => e.shooting);
+
+            const heightData = history.map(e => e.height || localStorage.getItem('btp_height'));
+            const reachData = history.map(e => e.reach || localStorage.getItem('btp_reach'));
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Вес (кг)',
+                            data: weightData,
+                            borderColor: '#00c2ff',
+                            backgroundColor: 'rgba(0, 194, 255, 0.1)',
+                            tension: 0.4,
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Прыжок (см)',
+                            data: jumpData,
+                            borderColor: '#ff9500',
+                            backgroundColor: 'rgba(255, 149, 0, 0.1)',
+                            tension: 0.4,
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Точность (%)',
+                            data: shootData,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            tension: 0.4,
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Рост (см)', // Желтый
+                            data: heightData,
+                            borderColor: '#ffd000',
+                            backgroundColor: 'rgba(255, 208, 0, 0.1)',
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Досягаемость (см)', // Оранжево-красный
+                            data: reachData,
+                            borderColor: '#ff5e00',
+                            backgroundColor: 'rgba(255, 94, 0, 0.1)',
+                            borderDash: [5, 5],
+                            tension: 0.1,
+                            spanGaps: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: 'white', font: { family: 'Unbounded', size: 12 } } }
+                    },
+                    scales: {
+                        x: { ticks: { color: 'rgba(255,255,255,0.6)' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        y: { ticks: { color: 'rgba(255,255,255,0.6)' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                    }
+                }
+            });
+
+            const listEl = document.getElementById('historyList');
+            listEl.innerHTML = history.slice().reverse().map(e => {
+                return `<div style="margin-bottom:10px;">
+                    <strong style="color:#ff9500;">${e.date}:</strong> 
+                    Вес: ${e.weight || '-'}кг | Прыжок: ${e.jump || '-'}см | Точность: ${e.shooting || '-'}%
+                </div>`;
+            }).join('');
+        }
+
+        // СЧЕТЧИК: Логика
+        let hits = 0, total = 0;
+        function updateStats() {
+            document.getElementById('hits').innerText = hits;
+            document.getElementById('total').innerText = total;
+            let pct = total === 0 ? 0 : Math.round((hits / total) * 100);
+            document.getElementById('percent').innerText = pct + '%';
+        }
+        document.getElementById('hitBtn').onclick = function() { hits++; total++; updateStats(); };
+        document.getElementById('missBtn').onclick = function() { total++; updateStats(); };
+        document.getElementById('resetBtn').onclick = function() { hits = 0; total = 0; updateStats(); };
+
+        // СЧЕТЧИК: Камера и ИИ
+        const video = document.getElementById('cameraFeed');
+        const canvas = document.getElementById('overlayCanvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startAiBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const videoUploadInput = document.getElementById('videoUpload');
+        const statusEl = document.getElementById('aiStatus');
+
+        let model;
+        let hoopBox = null;
+        let ballInHoop = false;
+        let aiActive = false;
+        let userReach = 231;
+        let hoopHeightCM = 305;
+
+        function updateHoopBox() {
+            const videoHeight = video.videoHeight;
+            const ratio = (hoopHeightCM / userReach);
+            hoopBox = { 
+                x: (video.videoWidth / 2) - 30, 
+                y: videoHeight - (videoHeight / ratio) - 70, 
+                width: 60, 
+                height: 60 
+            };
+        }
+
+        async function loadModel() {
+            statusEl.innerText = "Статус: Загружаем нейросеть...";
+            if (!model) {
+                model = await cocoSsd.load();
+            }
+            aiActive = true;
+            statusEl.innerText = "Статус: ИИ готов! Двигай камеру, чтобы рамка попалась на кольцо.";
+            detectFrame();
+        }
+
+        startBtn.onclick = async function() {
+            statusEl.innerText = "Статус: Запрашиваем камеру...";
+            userReach = parseFloat(document.getElementById('reachHeight').value) || 231;
+            hoopHeightCM = parseFloat(document.getElementById('hoopHeight').value) || 305;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.src = "";
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                await loadModel();
+            } catch (error) {
+                statusEl.innerText = "Ошибка камеры. Проверь разрешения.";
+                console.error(error);
+            }
+        };
+
+        uploadBtn.onclick = () => videoUploadInput.click();
+        videoUploadInput.onchange = async function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                statusEl.innerText = "Статус: Загружаем видео...";
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                video.srcObject = null;
+                video.loop = true;
+                video.muted = true;
+                video.play();
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+                hits = 0; total = 0; updateStats();
+                hoopBox = null;
+                await loadModel();
+            }
+        };
+
+        async function detectFrame() {
+            if (!aiActive) return;
+
+            const predictions = await model.detect(video);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updateHoopBox();
+
+            if (hoopBox) {
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(hoopBox.x, hoopBox.y, hoopBox.width, hoopBox.height);
+                ctx.setLineDash([]);
+            }
+
+            for (let i = 0; i < predictions.length; i++) {
+                const p = predictions[i];
+                if (p.class === 'sports ball') {
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]);
+
+                    if (hoopBox) {
+                        const ballCenterX = p.bbox[0] + p.bbox[2] / 2;
+                        const ballCenterY = p.bbox[1] + p.bbox[3] / 2;
+                        
+                        const isInside = ballCenterX > hoopBox.x && ballCenterX < hoopBox.x + hoopBox.width &&
+                                         ballCenterY > hoopBox.y && ballCenterY < hoopBox.y + hoopBox.height;
+
+                        if (isInside && !ballInHoop) {
+                            hits++;
+                            total++;
+                            updateStats();
+                            ballInHoop = true;
+                        } else if (!isInside) {
+                            ballInHoop = false;
+                        }
+                    }
+                }
+            }
+
+            requestAnimationFrame(detectFrame);
+        }
+
+        // ПРЫЖОК: Логика
+        const jumpVideo = document.getElementById('jumpFeed');
+        const jumpCanvas = document.getElementById('jumpCanvas');
+        const jumpCtx = jumpCanvas.getContext('2d');
+        const jumpStandBtn = document.getElementById('jumpStandBtn');
+        const jumpGoBtn = document.getElementById('jumpGoBtn');
+        const jumpUploadBtn = document.getElementById('uploadJumpBtn');
+        const jumpUploadInput = document.getElementById('jumpUpload');
+        const statusJump = document.getElementById('aiStatusJump');
+        const jumpResultEl = document.getElementById('jumpResult');
+
+        let jumpModel = null;
+        let standingBox = null;
+        let userRealHeight = 180;
+        let isJumping = false;
+
+        jumpStandBtn.onclick = async function() {
+            userRealHeight = parseFloat(document.getElementById('userHeight').value) || 180;
+            statusJump.innerText = "Статус: Калибруемся...";
+            
+            if (!jumpModel) {
+                jumpModel = await cocoSsd.load();
+            }
+            
+            const predictions = await jumpModel.detect(jumpVideo);
+            let foundUser = false;
+            for (let i = 0; i < predictions.length; i++) {
+                if (predictions[i].class === 'person') {
+                    standingBox = predictions[i].bbox; // [x, y, width, height]
+                    foundUser = true;
+                    break;
+                }
+            }
+
+            if (foundUser) {
+                statusJump.innerText = "Статус: Ты отлично стоишь! Нажми 'Прыгай!'";
+                jumpGoBtn.disabled = false;
+                jumpStandBtn.disabled = true;
+            } else {
+                statusJump.innerText = "Статус: Не вижу тебя в кадре. Отойди назад!";
+                jumpStandBtn.disabled = false;
+            }
+        };
+
+        jumpGoBtn.onclick = function() {
+            statusJump.innerText = "Статус: Прыгай!";
+            jumpGoBtn.disabled = true;
+            isJumping = true;
+            jumpResultEl.innerText = "0";
+            detectJump();
+        };
+
+        async function detectJump() {
+            if (!isJumping) return;
+
+            const predictions = await jumpModel.detect(jumpVideo);
+            let currentBox = null;
+            
+            for (let i = 0; i < predictions.length; i++) {
+                if (predictions[i].class === 'person') {
+                    currentBox = predictions[i].bbox;
+                    break;
+                }
+            }
+
+            if (currentBox && standingBox) {
+                const pixelJump = standingBox[1] - currentBox[1];
+                const standingHeightPixels = standingBox[3];
+                const cmPerPixel = userRealHeight / standingHeightPixels;
+                const jumpCm = pixelJump * cmPerPixel;
+
+                if (jumpCm > 0) {
+                    jumpResultEl.innerText = Math.round(jumpCm);
+                }
+            }
+
+            requestAnimationFrame(detectJump);
+        }
+
+        jumpUploadBtn.onclick = () => jumpUploadInput.click();
+        jumpUploadInput.onchange = async function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                jumpVideo.src = url;
+                jumpVideo.srcObject = null;
+                jumpVideo.loop = true;
+                jumpVideo.muted = true;
+                jumpVideo.play();
+                jumpVideo.onloadedmetadata = () => {
+                    jumpCanvas.width = jumpVideo.videoWidth;
+                    jumpCanvas.height = jumpVideo.videoHeight;
+                };
+                
+                statusJump.innerText = "Статус: Загружено. Нажми '1. Я стою', когда увидишь себя стоящим.";
+                jumpStandBtn.disabled = false;
+                jumpGoBtn.disabled = true;
+                isJumping = false;
+                standingBox = null;
+                
+                if (!jumpModel) {
+                    jumpModel = await cocoSsd.load();
+                }
+            }
+        };
+
+        loadProfile();
+    </script>
+</body>
+</html>
