@@ -137,7 +137,9 @@
         }
         button:hover::after { left: 150%; }
 
-        button:active { transform: scale(0.95); }
+        /* Тактильный отклик на телефоне */
+        button:active { transform: scale(0.9); filter: brightness(0.9); }
+        .btn-hit:active .basketball-icon { transform: scale(1.3); }
         
         button:hover {
             transform: scale(1.03); 
@@ -172,7 +174,7 @@
         #resetBtn { background: transparent; border: 2px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.8); width: 100%; margin-top: 10px; }
         #resetBtn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); color: white; filter: none; box-shadow: none; }
 
-        input {
+        input, select {
             width: 100%;
             padding: 12px;
             border-radius: 10px;
@@ -193,9 +195,24 @@
             margin: 0; 
         }
 
-        input:focus {
+        input:focus, select:focus {
             border-color: #ff9500;
             box-shadow: 0 0 15px rgba(255, 149, 0, 0.3);
+        }
+
+        /* Надежный стилизованный SELECT */
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ff9500' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        select option {
+            background: #121212;
+            color: white;
         }
 
         .chart-container { height: 300px; background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 20px; margin-bottom: 20px; position: relative; }
@@ -308,8 +325,18 @@
                 <input type="number" id="userHeight" placeholder="180">
             </div>
 
+            <div class="input-group">
+                <label>Тип прыжка</label>
+                <!-- НАДЕЖНЫЙ SELECT, который точно откроется -->
+                <select id="jumpType">
+                    <option value="standing">С места (камера спереди)</option>
+                    <option value="runup">С разбега (камера сбоку)</option>
+                    <option value="dunk">Данк (по мячу)</option>
+                </select>
+            </div>
+
             <div class="btn-group">
-                <button id="jumpStandBtn" disabled>1. Я стою (калибровка)</button>
+                <button id="jumpStandBtn" disabled>1. Калибровка</button>
                 <button id="jumpGoBtn" disabled>2. Прыгай!</button>
                 <button id="uploadJumpBtn">Загрузить видео</button>
             </div>
@@ -403,7 +430,6 @@
             setTimeout(() => document.getElementById('profileStatus').innerText = "", 2000);
         }
 
-        // Улучшенная загрузка профиля
         function loadProfile() {
             const h = localStorage.getItem('btp_height') || '';
             const w = localStorage.getItem('btp_weight') || '';
@@ -458,7 +484,7 @@
             alert("Данные записаны в историю!");
         }
 
-        // Рендер графика с измененными цветами
+        // Рендер графика
         let myChart = null;
         function renderHistory() {
             const history = getHistory();
@@ -506,7 +532,7 @@
                             spanGaps: true
                         },
                         {
-                            label: 'Рост (см)', // Желтый
+                            label: 'Рост (см)',
                             data: heightData,
                             borderColor: '#ffd000',
                             backgroundColor: 'rgba(255, 208, 0, 0.1)',
@@ -515,7 +541,7 @@
                             spanGaps: true
                         },
                         {
-                            label: 'Досягаемость (см)', // Оранжево-красный
+                            label: 'Досягаемость (см)',
                             data: reachData,
                             borderColor: '#ff5e00',
                             backgroundColor: 'rgba(255, 94, 0, 0.1)',
@@ -634,8 +660,16 @@
             }
         };
 
+        // Оптимизированная версия detectFrame с пропуском кадров
+        let frameCounter = 0;
         async function detectFrame() {
             if (!aiActive) return;
+
+            frameCounter++;
+            if (frameCounter % 3 !== 0) {
+                requestAnimationFrame(detectFrame);
+                return;
+            }
 
             const predictions = await model.detect(video);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -679,7 +713,7 @@
             requestAnimationFrame(detectFrame);
         }
 
-        // ПРЫЖОК: Логика
+        // ПРЫЖОК: Логика с select (самый надежный вариант)
         const jumpVideo = document.getElementById('jumpFeed');
         const jumpCanvas = document.getElementById('jumpCanvas');
         const jumpCtx = jumpCanvas.getContext('2d');
@@ -689,11 +723,25 @@
         const jumpUploadInput = document.getElementById('jumpUpload');
         const statusJump = document.getElementById('aiStatusJump');
         const jumpResultEl = document.getElementById('jumpResult');
+        const jumpTypeSelect = document.getElementById('jumpType');
 
         let jumpModel = null;
         let standingBox = null;
         let userRealHeight = 180;
         let isJumping = false;
+        let currentJumpMode = 'standing'; // standing, runup, dunk
+
+        // Следим за сменой select
+        jumpTypeSelect.addEventListener('change', function() {
+            currentJumpMode = this.value;
+            if (currentJumpMode === 'runup') {
+                statusJump.innerText = "Статус: Поставь телефон СБОКУ (на 90 градусов) для точного замера с разбега!";
+            } else if (currentJumpMode === 'dunk') {
+                statusJump.innerText = "Статус: Наведи камеру на мяч в руках. Будем мерить высоту мяча!";
+            } else {
+                statusJump.innerText = "Статус: Камера должна быть перед тобой.";
+            }
+        });
 
         jumpStandBtn.onclick = async function() {
             userRealHeight = parseFloat(document.getElementById('userHeight').value) || 180;
@@ -705,21 +753,37 @@
             
             const predictions = await jumpModel.detect(jumpVideo);
             let foundUser = false;
+            let foundBall = false;
+            
             for (let i = 0; i < predictions.length; i++) {
-                if (predictions[i].class === 'person') {
-                    standingBox = predictions[i].bbox; // [x, y, width, height]
+                if (predictions[i].class === 'person' && !foundUser) {
+                    standingBox = predictions[i].bbox;
                     foundUser = true;
-                    break;
+                }
+                if (predictions[i].class === 'sports ball') {
+                    standingBox = predictions[i].bbox; 
+                    foundBall = true;
                 }
             }
 
-            if (foundUser) {
-                statusJump.innerText = "Статус: Ты отлично стоишь! Нажми 'Прыгай!'";
-                jumpGoBtn.disabled = false;
-                jumpStandBtn.disabled = true;
+            if (currentJumpMode === 'dunk') {
+                if (foundBall) {
+                    statusJump.innerText = "Статус: Мяч найден! Запомнили высоту мяча. Теперь прыгай и делай данк!";
+                    jumpGoBtn.disabled = false;
+                    jumpStandBtn.disabled = true;
+                } else {
+                    statusJump.innerText = "Статус: Мяч не найден в кадре. Просто держи мяч в руках!";
+                    jumpStandBtn.disabled = false;
+                }
             } else {
-                statusJump.innerText = "Статус: Не вижу тебя в кадре. Отойди назад!";
-                jumpStandBtn.disabled = false;
+                if (foundUser) {
+                    statusJump.innerText = "Статус: Ты отлично стоишь! Нажми 'Прыгай!'";
+                    jumpGoBtn.disabled = false;
+                    jumpStandBtn.disabled = true;
+                } else {
+                    statusJump.innerText = "Статус: Не вижу тебя в кадре. Отойди назад!";
+                    jumpStandBtn.disabled = false;
+                }
             }
         };
 
@@ -738,9 +802,16 @@
             let currentBox = null;
             
             for (let i = 0; i < predictions.length; i++) {
-                if (predictions[i].class === 'person') {
-                    currentBox = predictions[i].bbox;
-                    break;
+                if (currentJumpMode === 'dunk') {
+                    if (predictions[i].class === 'sports ball') {
+                        currentBox = predictions[i].bbox;
+                        break;
+                    }
+                } else {
+                    if (predictions[i].class === 'person') {
+                        currentBox = predictions[i].bbox;
+                        break;
+                    }
                 }
             }
 
@@ -773,7 +844,7 @@
                     jumpCanvas.height = jumpVideo.videoHeight;
                 };
                 
-                statusJump.innerText = "Статус: Загружено. Нажми '1. Я стою', когда увидишь себя стоящим.";
+                statusJump.innerText = "Статус: Загружено. Выбери тип прыжка и нажми 'Калибровка'.";
                 jumpStandBtn.disabled = false;
                 jumpGoBtn.disabled = true;
                 isJumping = false;
