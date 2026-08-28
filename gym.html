@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
-    <!-- Подключаем TensorFlow (уже работает у тебя) -->
+    <!-- Подключаем TensorFlow и PoseNet -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <!-- Подключаем PoseNet -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -131,7 +130,6 @@
     </div>
 
     <script>
-        // Логика выбора диапазона повторений
         let selectedRepRange = "8-10";
         document.querySelectorAll('.rep-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -141,7 +139,6 @@
             });
         });
 
-        // Калькулятор 1ПМ
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -156,7 +153,6 @@
             table.innerHTML = html;
         };
 
-        // Калькулятор Рабочего Веса
         document.getElementById('calc2Btn').onclick = function() {
             const oneRM = parseFloat(document.getElementById('workWeightBase').value);
             if (!oneRM || oneRM <= 0) { alert("Введите свой 1ПМ!"); return; }
@@ -170,7 +166,7 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // РАЗБОР ТЕХНИКИ НА POSENET (Локальная загрузка без блокировок)
+        // РАЗБОР ТЕХНИКИ НА POSENET
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -188,7 +184,6 @@
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                // Загружаем PoseNet с локального CDN, как обычный TensorFlow
                 net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.75 });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
@@ -203,8 +198,17 @@
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
                 const url = URL.createObjectURL(file);
-                techVideo.src = url; techVideo.srcObject = null; techVideo.loop = true; techVideo.muted = true; techVideo.play();
-                techVideo.onloadedmetadata = () => { techCanvas.width = techVideo.videoWidth; techCanvas.height = techVideo.videoHeight; seekTech.style.display = 'block'; playPauseTechBtn.style.display = 'block'; };
+                techVideo.src = url; techVideo.srcObject = null; techVideo.loop = true; techVideo.muted = true;
+                
+                // ЗАЩИТА ОТ ПАУЗЫ: Сразу ставим на автовоспроизведение и ждем метаданные
+                techVideo.play().catch(err => console.log("Автовоспроизведение заблокировано"));
+                
+                techVideo.onloadedmetadata = () => { 
+                    techCanvas.width = techVideo.videoWidth || 640; 
+                    techCanvas.height = techVideo.videoHeight || 480; 
+                    seekTech.style.display = 'block'; 
+                    playPauseTechBtn.style.display = 'block'; 
+                };
                 seekTech.max = 100; seekTech.value = 0;
                 techVideo.addEventListener('timeupdate', () => { const progress = (techVideo.currentTime / techVideo.duration) * 100; seekTech.value = progress; seekTech.style.setProperty('--progress', progress + '%'); });
                 seekTech.addEventListener('input', () => { techVideo.currentTime = (seekTech.value / 100) * techVideo.duration; });
@@ -222,6 +226,13 @@
             return angle;
         }
 
+        // ОЦЕНКА ОТ 0 ДО 100 НА ОСНОВЕ УГЛА
+        function calculateScore(idealAngle, currentAngle) {
+            let score = 100 - Math.abs(idealAngle - currentAngle) * 2;
+            if (score < 0) score = 0;
+            return Math.round(score);
+        }
+
         function getFeedback(landmarks) {
             const lShoulder = landmarks[5], rShoulder = landmarks[6];
             const lElbow = landmarks[7], rElbow = landmarks[8];
@@ -231,19 +242,37 @@
             const lAnkle = landmarks[15], rAnkle = landmarks[16];
             const exercise = exerciseSelect.value;
             let feedback = "";
-            if (exercise === 'chest_press') {
-                const angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 90) feedback = "Опускай локти глубже (до ~90°)";
-                else if (angle > 160) feedback = "Не выпрямляй локти до конца";
-                else feedback = "Жим выполняется верно!";
+            let angle = 0;
+            
+            if (exercise === 'chest_press' || exercise === 'lat_pulldown' || exercise === 'seated_row') {
+                angle = calculateAngle(lShoulder, lElbow, lWrist);
+                // Идеальный угол в нижней точке - 90 градусов
+                if (angle < 90) feedback = "Опускай локти глубже (до ~90°). Оценка: " + calculateScore(90, angle);
+                else if (angle > 160) feedback = "Не выпрямляй локти до конца. Оценка: " + calculateScore(160, angle);
+                else feedback = "Угол локтя идеальный! Оценка: " + calculateScore(90, angle);
             }
             else if (exercise === 'bicep_curl') {
-                const angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 60) feedback = "Сгибай руку выше, до максимума!";
-                else if (angle > 170) feedback = "Опускай руку полностью вниз";
-                else feedback = "Подъем выполняется верно!";
+                angle = calculateAngle(lShoulder, lElbow, lWrist);
+                if (angle < 60) feedback = "Сгибай руку выше, до максимума! Оценка: " + calculateScore(60, angle);
+                else if (angle > 170) feedback = "Опускай руку полностью вниз. Оценка: " + calculateScore(170, angle);
+                else feedback = "Подъем выполняется верно! Оценка: " + calculateScore(60, angle);
             }
-            else { return "Скелет построен. Анализируй углы на видео."; }
+            else if (exercise === 'tricep_pushdown') {
+                angle = calculateAngle(lShoulder, lElbow, lWrist);
+                if (angle < 50) feedback = "Разгибай руку полностью! Оценка: " + calculateScore(160, angle);
+                else if (angle > 170) feedback = "Опускай руку полностью вниз. Оценка: " + calculateScore(160, angle);
+                else feedback = "Трицепс работает верно! Оценка: " + calculateScore(160, angle);
+            }
+            else if (exercise === 'leg_extension' || exercise === 'glute_kickback') {
+                angle = calculateAngle(lHip, lKnee, lAnkle);
+                if (angle < 90) feedback = "Разгибай колено сильнее! Оценка: " + calculateScore(160, angle);
+                else if (angle > 170) feedback = "Не разгибай колено до конца. Оценка: " + calculateScore(160, angle);
+                else feedback = "Нога работает верно! Оценка: " + calculateScore(160, angle);
+            }
+            else {
+                return "Скелет построен. Анализируй углы на видео.";
+            }
+            
             return feedback;
         }
 
@@ -281,11 +310,7 @@
                     const angle = calculateAngle(keypoints[5], keypoints[7], keypoints[9]);
                     techCtx.fillText(angle.toFixed(0) + "°", keypoints[7].position.x * techCanvas.width + 10, keypoints[7].position.y * techCanvas.height + 10);
                 }
-                if (exercise === 'lat_pulldown' || exercise === 'seated_row') {
-                    const angle = calculateAngle(keypoints[5], keypoints[11], keypoints[13]);
-                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[11].position.x * techCanvas.width + 10, keypoints[11].position.y * techCanvas.height + 10);
-                }
-                if (exercise === 'leg_extension' || exercise === 'glute_kickback') {
+                if (exercise === 'lat_pulldown' || exercise === 'seated_row' || exercise === 'leg_extension' || exercise === 'glute_kickback') {
                     const angle = calculateAngle(keypoints[11], keypoints[13], keypoints[15]);
                     techCtx.fillText(angle.toFixed(0) + "°", keypoints[13].position.x * techCanvas.width + 10, keypoints[13].position.y * techCanvas.height + 10);
                 }
