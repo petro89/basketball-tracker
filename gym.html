@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
-    <!-- Подключаем TensorFlow и PoseNet -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
@@ -130,7 +129,6 @@
     </div>
 
     <script>
-        // Логика выбора диапазона повторений
         let selectedRepRange = "8-10";
         document.querySelectorAll('.rep-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -140,7 +138,6 @@
             });
         });
 
-        // Калькулятор 1ПМ
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -155,7 +152,6 @@
             table.innerHTML = html;
         };
 
-        // Калькулятор Рабочего Веса
         document.getElementById('calc2Btn').onclick = function() {
             const oneRM = parseFloat(document.getElementById('workWeightBase').value);
             if (!oneRM || oneRM <= 0) { alert("Введите свой 1ПМ!"); return; }
@@ -169,7 +165,6 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // РАЗБОР ТЕХНИКИ НА POSENET (ИСПРАВЛЕННАЯ ВЕРСИЯ)
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -183,11 +178,12 @@
         let net = null;
         let techFrames = 0;
 
+        // УМЕНЬШИЛИ РАЗРЕШЕНИЕ ДО 192 ДЛЯ БЫСТРОЙ РАБОТЫ НА ТЕЛЕФОНЕ
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.75 });
+                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 192, multiplier: 0.75 });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -201,12 +197,10 @@
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
 
-                // Загружаем сеть, если нужно
                 if (!net) {
                     await initPose();
                 }
 
-                // Останавливаем старое видео
                 techVideo.pause();
 
                 const url = URL.createObjectURL(file);
@@ -257,7 +251,6 @@
             const lAnkle = keypoints[15], rAnkle = keypoints[16];
             const exercise = exerciseSelect.value;
 
-            // Проверяем, видит ли сеть ключевые точки
             if (!lShoulder || !lElbow || !lWrist || !lShoulder.position || !lElbow.position || !lWrist.position) {
                 return "Не вижу руку в кадре. Повернись так, чтобы плечо, локоть и запястье были видны.";
             }
@@ -329,7 +322,7 @@
                 
                 techCtx.strokeStyle = '#00ff00'; techCtx.lineWidth = 3; techCtx.beginPath();
                 connections.forEach(([a,b]) => {
-                    if (keypoints[a] && keypoints[b] && keypoints[a].position && keypoints[b].position && keypoints[a].score > 0.4 && keypoints[b].score > 0.4) {
+                    if (keypoints[a] && keypoints[b] && keypoints[a].position && keypoints[b].position && keypoints[a].score > 0.3 && keypoints[b].score > 0.3) {
                         techCtx.moveTo(keypoints[a].position.x * techCanvas.width, keypoints[a].position.y * techCanvas.height);
                         techCtx.lineTo(keypoints[b].position.x * techCanvas.width, keypoints[b].position.y * techCanvas.height);
                     }
@@ -338,24 +331,23 @@
 
                 techCtx.fillStyle = '#ff9500';
                 for (let i = 0; i < keypoints.length; i++) {
-                    if (keypoints[i] && keypoints[i].position && keypoints[i].score > 0.4) {
+                    if (keypoints[i] && keypoints[i].position && keypoints[i].score > 0.3) {
                         techCtx.beginPath();
                         techCtx.arc(keypoints[i].position.x * techCanvas.width, keypoints[i].position.y * techCanvas.height, 5, 0, 2 * Math.PI);
                         techCtx.fill();
                     }
                 }
 
-                // Вывод угла
                 techCtx.fillStyle = '#ffffff';
                 techCtx.font = '16px Arial';
                 const exercise = exerciseSelect.value;
-                if (keypoints[7] && keypoints[7].position && keypoints[7].score > 0.4) {
+                if (keypoints[7] && keypoints[7].position && keypoints[7].score > 0.3) {
                     if (exercise === 'chest_press' || exercise === 'bicep_curl' || exercise === 'tricep_pushdown' || exercise === 'lat_pulldown' || exercise === 'seated_row') {
                         const angle = calculateAngle(keypoints[5], keypoints[7], keypoints[9]);
                         if (angle !== null) techCtx.fillText(angle.toFixed(0) + "°", keypoints[7].position.x * techCanvas.width + 10, keypoints[7].position.y * techCanvas.height + 10);
                     }
                 }
-                if (keypoints[13] && keypoints[13].position && keypoints[13].score > 0.4) {
+                if (keypoints[13] && keypoints[13].position && keypoints[13].score > 0.3) {
                     if (exercise === 'leg_extension' || exercise === 'glute_kickback') {
                         const angle = calculateAngle(keypoints[11], keypoints[13], keypoints[15]);
                         if (angle !== null) techCtx.fillText(angle.toFixed(0) + "°", keypoints[13].position.x * techCanvas.width + 10, keypoints[13].position.y * techCanvas.height + 10);
@@ -367,9 +359,15 @@
         }
 
         async function detectTechnique() {
-            if (techVideo.readyState < 2 || !net) return;
+            if (techVideo.readyState < 2 || !net) {
+                requestAnimationFrame(detectTechnique);
+                return;
+            }
+
+            // ОБРАБАТЫВАЕМ КАЖДЫЙ 10-Й КАДР, ЧТОБЫ ТЕЛЕФОН НЕ ЛАГАЛ
             techFrames++;
-            if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            if (techFrames % 10 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
                 drawSkeleton(pose.keypoints);
