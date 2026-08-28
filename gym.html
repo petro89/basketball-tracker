@@ -6,8 +6,8 @@
     <title>Gym Technique & Calculators</title>
     <!-- Подключаем TensorFlow (уже работает у тебя) -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <!-- Подключаем pose-detection -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <!-- Подключаем PoseNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -141,7 +141,7 @@
             });
         });
 
-        // Калькулятор 1ПМ (формула Эпли)
+        // Калькулятор 1ПМ
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -170,7 +170,7 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // РАЗБОР ТЕХНИКИ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+        // РАЗБОР ТЕХНИКИ НА POSENET (Локальная загрузка без блокировок)
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -181,18 +181,15 @@
         const seekTech = document.getElementById('seekTech');
         const playPauseTechBtn = document.getElementById('playPauseTech');
 
-        let detector = null;
+        let net = null;
         let techFrames = 0;
 
         async function initPose() {
-            statusTech.innerText = "Статус: Загружаем нейросеть (MoveNet)...";
+            statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                const model = poseDetection.SupportedModels.MoveNet;
-                // Убрали modelUrl - теперь библиотека сама возьмёт правильную ссылку
-                detector = await poseDetection.createDetector(model, {
-                    modelType: 'SinglePose.Lightning'
-                });
+                // Загружаем PoseNet с локального CDN, как обычный TensorFlow
+                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.75 });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -212,7 +209,7 @@
                 techVideo.addEventListener('timeupdate', () => { const progress = (techVideo.currentTime / techVideo.duration) * 100; seekTech.value = progress; seekTech.style.setProperty('--progress', progress + '%'); });
                 seekTech.addEventListener('input', () => { techVideo.currentTime = (seekTech.value / 100) * techVideo.duration; });
                 playPauseTechBtn.onclick = () => { if (techVideo.paused) { techVideo.play(); playPauseTechBtn.innerText = "⏯ Пауза"; } else { techVideo.pause(); playPauseTechBtn.innerText = "▶ Играть"; } };
-                if (!detector) await initPose();
+                if (!net) await initPose();
                 techFrames = 0;
                 detectTechnique();
             }
@@ -226,12 +223,12 @@
         }
 
         function getFeedback(landmarks) {
-            const lShoulder = landmarks[11], rShoulder = landmarks[12];
-            const lElbow = landmarks[13], rElbow = landmarks[14];
-            const lWrist = landmarks[15], rWrist = landmarks[16];
-            const lHip = landmarks[23], rHip = landmarks[24];
-            const lKnee = landmarks[25], rKnee = landmarks[26];
-            const lAnkle = landmarks[27], rAnkle = landmarks[28];
+            const lShoulder = landmarks[5], rShoulder = landmarks[6];
+            const lElbow = landmarks[7], rElbow = landmarks[8];
+            const lWrist = landmarks[9], rWrist = landmarks[10];
+            const lHip = landmarks[11], rHip = landmarks[12];
+            const lKnee = landmarks[13], rKnee = landmarks[14];
+            const lAnkle = landmarks[15], rAnkle = landmarks[16];
             const exercise = exerciseSelect.value;
             let feedback = "";
             if (exercise === 'chest_press') {
@@ -254,16 +251,16 @@
             techCtx.clearRect(0, 0, techCanvas.width, techCanvas.height);
             if (keypoints && keypoints.length > 0) {
                 const connections = [
+                    [5,7], [7,9], [6,8], [8,10],
                     [11,13], [13,15], [12,14], [14,16],
-                    [23,25], [25,27], [24,26], [26,28],
-                    [11,12], [11,23], [12,24], [23,24]
+                    [5,6], [5,11], [6,12], [11,12]
                 ];
                 
                 techCtx.strokeStyle = '#00ff00'; techCtx.lineWidth = 3; techCtx.beginPath();
                 connections.forEach(([a,b]) => {
                     if (keypoints[a] && keypoints[b]) {
-                        techCtx.moveTo(keypoints[a].x * techCanvas.width, keypoints[a].y * techCanvas.height);
-                        techCtx.lineTo(keypoints[b].x * techCanvas.width, keypoints[b].y * techCanvas.height);
+                        techCtx.moveTo(keypoints[a].position.x * techCanvas.width, keypoints[a].position.y * techCanvas.height);
+                        techCtx.lineTo(keypoints[b].position.x * techCanvas.width, keypoints[b].position.y * techCanvas.height);
                     }
                 });
                 techCtx.stroke();
@@ -272,7 +269,7 @@
                 for (let i = 0; i < keypoints.length; i++) {
                     if (keypoints[i]) {
                         techCtx.beginPath();
-                        techCtx.arc(keypoints[i].x * techCanvas.width, keypoints[i].y * techCanvas.height, 5, 0, 2 * Math.PI);
+                        techCtx.arc(keypoints[i].position.x * techCanvas.width, keypoints[i].position.y * techCanvas.height, 5, 0, 2 * Math.PI);
                         techCtx.fill();
                     }
                 }
@@ -281,16 +278,16 @@
                 techCtx.font = '16px Arial';
                 const exercise = exerciseSelect.value;
                 if (exercise === 'chest_press' || exercise === 'bicep_curl' || exercise === 'tricep_pushdown') {
-                    const angle = calculateAngle(keypoints[11], keypoints[13], keypoints[15]);
-                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[13].x * techCanvas.width + 10, keypoints[13].y * techCanvas.height + 10);
+                    const angle = calculateAngle(keypoints[5], keypoints[7], keypoints[9]);
+                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[7].position.x * techCanvas.width + 10, keypoints[7].position.y * techCanvas.height + 10);
                 }
                 if (exercise === 'lat_pulldown' || exercise === 'seated_row') {
-                    const angle = calculateAngle(keypoints[11], keypoints[23], keypoints[25]);
-                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[23].x * techCanvas.width + 10, keypoints[23].y * techCanvas.height + 10);
+                    const angle = calculateAngle(keypoints[5], keypoints[11], keypoints[13]);
+                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[11].position.x * techCanvas.width + 10, keypoints[11].position.y * techCanvas.height + 10);
                 }
                 if (exercise === 'leg_extension' || exercise === 'glute_kickback') {
-                    const angle = calculateAngle(keypoints[23], keypoints[25], keypoints[27]);
-                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[25].x * techCanvas.width + 10, keypoints[25].y * techCanvas.height + 10);
+                    const angle = calculateAngle(keypoints[11], keypoints[13], keypoints[15]);
+                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[13].position.x * techCanvas.width + 10, keypoints[13].position.y * techCanvas.height + 10);
                 }
                 statusTech.innerText = "Статус: " + getFeedback(keypoints);
             }
@@ -300,9 +297,9 @@
             if (techVideo.readyState < 2) return;
             techFrames++;
             if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
-            const poses = await detector.estimatePoses(techVideo);
-            if (poses && poses.length > 0) {
-                drawSkeleton(poses[0].keypoints);
+            const pose = await net.estimateSinglePose(techVideo);
+            if (pose && pose.keypoints) {
+                drawSkeleton(pose.keypoints);
             }
             requestAnimationFrame(detectTechnique);
         }
