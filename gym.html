@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
-    <!-- Локальная библиотека -->
-    <script src="./pose-detection.min.js"></script>
-    <!-- TensorFlow база -->
+    <!-- Используем ту же CDN, что и TensorFlow в index.html -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -189,7 +188,7 @@
             try {
                 await tf.ready();
                 const model = poseDetection.SupportedModels.MoveNet;
-                // ОШИБКА БЫЛА ЗДЕСЬ! Заменили объект на строку 'SINGLEPOSE_LIGHTNING'
+                // ВАЖНО: Просто строка, без объектов!
                 detector = await poseDetection.createDetector(model, { modelType: 'SINGLEPOSE_LIGHTNING' });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
