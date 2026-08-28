@@ -216,8 +216,8 @@
         let minAngle = 180;
         let repCount = 0;
         let qualityReps = 0;
-        let lastPhase = 0; // 0 = нейтрально, 1 = сокращение, 2 = растяжение
-        let repCooldown = 0; // Задержка после подсчета повторения
+        let lastPhase = 0; // 0 = нейтрально, 1 = сокращение
+        let repCooldown = 0;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -370,25 +370,28 @@
                         if (angle > maxAngle) maxAngle = angle;
                         if (angle < minAngle) minAngle = angle;
 
-                        // Уменьшаем кулдаун
                         if (repCooldown > 0) repCooldown--;
 
-                        // Улучшенный подсчет повторений с защитой от дребезга
-                        // 1. Определяем фазу сокращения (угол < 95)
-                        if (angle < 95 && lastPhase !== 1) {
-                            lastPhase = 1; // Вошли в сокращение
-                        }
-                        // 2. Если мы были в сокращении и вернулись в полное растяжение (угол > 165), считаем повторение
-                        else if (angle > 165 && lastPhase === 1 && repCooldown === 0) {
-                            repCount++;
-                            qualityReps++;
-                            lastPhase = 2; // Вошли в растяжение
-                            repCooldown = 15; // Блокируем счет на 15 кадров (следующие 150 обработанных миллисекунд)
-                        }
-                        // 3. Если мы были в растяжении и снова вошли в сокращение, сбрасываем фазу для следующего цикла
-                        else if (angle < 95 && lastPhase === 2) {
+                        // Логика подсчета повторений с обнаружением некачественных
+                        // 1. Начало сокращения: угол < 120 (смягчаем порог, чтобы считать неполные)
+                        if (angle < 120 && lastPhase !== 1) {
                             lastPhase = 1;
                         }
+                        // 2. Возврат из сокращения: угол > 140
+                        else if (lastPhase === 1 && angle > 140 && repCooldown === 0) {
+                            repCount++;
+                            
+                            // Проверяем качество повторения
+                            if (minAngle <= 95 && maxAngle >= 165) {
+                                qualityReps++;
+                            }
+                            
+                            lastPhase = 0; // Сброс фазы
+                            maxAngle = 0; // Сброс макс угла
+                            minAngle = 180; // Сброс мин угла
+                            repCooldown = 15; // Защита от дребезга
+                        }
+                        // 3. Если мы начали сокращение (lastPhase == 1), но вернулись, не дойдя до 140, фаза может сброситься только при новом сокращении
                     }
                 }
             }
