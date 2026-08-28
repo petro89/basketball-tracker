@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
-    <!-- Подключаем ЛОКАЛЬНУЮ библиотеку вместо CDN -->
+    <!-- Локальная библиотека -->
     <script src="./pose-detection.min.js"></script>
-    <!-- TensorFlow всё ещё нужен как база -->
+    <!-- TensorFlow база -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -60,7 +60,6 @@
         <p class="subtitle">ИИ-разбор и расчет весов</p>
         <a href="index.html" class="nav-link">🏀 Вернуться к Броскам и Прыжкам</a>
 
-        <!-- Калькулятор 1ПМ -->
         <div class="calc-section">
             <h3 style="color:#ff9500; margin-bottom:10px;">Калькулятор Максимального Веса (1ПМ)</h3>
             <div style="display:flex; gap:10px;">
@@ -72,7 +71,6 @@
             <div class="calc-table" id="calcTable1"></div>
         </div>
 
-        <!-- Калькулятор Рабочего Веса -->
         <div class="calc-section">
             <h3 style="color:#00c2ff; margin-bottom:10px;">Калькулятор Рабочего Веса</h3>
             <p style="font-size:12px; color:rgba(255,255,255,0.6); margin-bottom:15px;">Введи свой 1ПМ или рассчитай его выше, затем выбери цель</p>
@@ -143,7 +141,7 @@
             });
         });
 
-        // Калькулятор 1ПМ (формула Эпли - стандартная и точная)
+        // Калькулятор 1ПМ (формула Эпли)
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -172,7 +170,7 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // РАЗБОР ТЕХНИКИ НА MOVENET (локальная библиотека, работающая через TensorFlow)
+        // РАЗБОР ТЕХНИКИ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -189,9 +187,10 @@
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (MoveNet)...";
             try {
-                await tf.ready(); // Убеждаемся, что TensorFlow готов
+                await tf.ready();
                 const model = poseDetection.SupportedModels.MoveNet;
-                detector = await poseDetection.createDetector(model, { modelType: poseDetection.movenetModelType.SINGLEPOSE_LIGHTNING });
+                // ОШИБКА БЫЛА ЗДЕСЬ! Заменили объект на строку 'SINGLEPOSE_LIGHTNING'
+                detector = await poseDetection.createDetector(model, { modelType: 'SINGLEPOSE_LIGHTNING' });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
