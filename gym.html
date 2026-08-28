@@ -48,14 +48,12 @@
         .rep-btn { flex: 1; padding: 10px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); background: transparent; color: white; font-size: 14px; cursor: pointer; transition: all 0.3s; }
         .rep-btn.active { background: linear-gradient(135deg, #ff9500, #ff5e00); border-color: transparent; box-shadow: 0 5px 15px rgba(255,149,0,0.4); }
 
-        /* Стили для советов по технике */
         #exerciseTips { background: rgba(0, 194, 255, 0.05); border: 1px solid rgba(0, 194, 255, 0.2); border-radius: 15px; padding: 15px; margin-bottom: 15px; font-size: 12px; text-align: left; color: rgba(255, 255, 255, 0.85); }
         #exerciseTips h4 { color: #00c2ff; margin-bottom: 8px; font-size: 13px; }
         #exerciseTips ul { padding-left: 15px; margin-bottom: 5px; }
         #exerciseTips li { margin-bottom: 6px; line-height: 1.4; }
-        #exerciseTips .tip-desc { font-size: 10px; color: rgba(255,255,255,0.6); font-style: italic; margin-top: 3px; }
 
-        @media (max-width: 600px) { body { padding: 10px; } .card { padding: 15px 12px; border-radius: 24px; } .video-container { height: 200px; } button { padding: 12px 15px; font-size: 14px; } .pause-btn { font-size: 13px; } }
+        @media (max-width: 600px) { body { padding: 10px; } .card { padding: 15px 12px; border-radius: 24px; } .video-container { height: 200px; } button { padding: 12px 15px; font-size: 14px; } }
     </style>
 </head>
 <body>
@@ -80,7 +78,6 @@
             <h3 style="color:#00c2ff; margin-bottom:10px;">Калькулятор Рабочего Веса</h3>
             <p style="font-size:12px; color:rgba(255,255,255,0.6); margin-bottom:15px;">Введи свой 1ПМ или рассчитай его выше, затем выбери цель</p>
             <input type="number" id="workWeightBase" placeholder="Твой 1ПМ (кг)" style="margin-bottom:15px;">
-            
             <div class="rep-buttons" id="repButtonsContainer">
                 <button class="rep-btn active" data-target="8-10">8-10</button>
                 <button class="rep-btn" data-target="6-8">6-8</button>
@@ -88,7 +85,6 @@
                 <button class="rep-btn" data-target="12-15">12-15</button>
                 <button class="rep-btn" data-target="15-20">15-20</button>
             </div>
-            
             <button id="calc2Btn">Рассчитать Рабочий Вес</button>
             <div class="calc-result" id="workResult">0 кг</div>
             <div style="font-size:12px; color:rgba(255,255,255,0.6);">Рекомендуемый вес для выбранного диапазона</div>
@@ -128,7 +124,6 @@
             </select>
         </div>
 
-        <!-- БЛОК С СОВЕТАМИ ПРОФЕССИОНАЛОВ -->
         <div id="exerciseTips"></div>
 
         <div class="btn-group">
@@ -139,90 +134,19 @@
     </div>
 
     <script>
-        // ================= ДАННЫЕ ДЛЯ СОВЕТОВ =================
-        const tipsData = {
-            'chest_press': [
-                { title: "Дыхание", desc: "Вдох при опускании, выдох при жиме вверх. Не задерживай дыхание." },
-                { title: "Лопатки", desc: "Сведи лопатки и прижми их к скамье. Это защищает плечи и стабилизирует грудь." },
-                { title: "Темп", desc: "Опускай вес за 2 секунды, выжимай мощно за 1 секунду (2-0-1)." }
-            ],
-            'butterfly': [
-                { title: "Дыхание", desc: "Выдох при сведении рук, вдох при возвращении." },
-                { title: "Локти", desc: "Держи локти слегка согнутыми (около 15 градусов) и зафиксированными в течение всего движения." },
-                { title: "Темп", desc: "Своди руки за 1 секунду, разводи за 2 секунды (1-0-2)." }
-            ],
-            'lat_pulldown': [
-                { title: "Дыхание", desc: "Выдох при тяге вниз, вдох при возвращении вверх." },
-                { title: "Корпус", desc: "Наклони корпус чуть назад (10-15 градусов) и следи, чтобы таз не отрывался от скамьи." },
-                { title: "Лопатки", desc: "Тяни за счет сведения лопаток, а не руками. В нижней точке лопатки полностью сведены." },
-                { title: "Темп", desc: "Тяни вниз за 1 секунду, опускай вверх за 2 секунды (1-0-2)." }
-            ],
-            'seated_row': [
-                { title: "Дыхание", desc: "Выдох при тяге к поясу, вдох при возвращении." },
-                { title: "Спина", desc: "Держи спину прямой на протяжении всего движения, не округляй поясницу." },
-                { title: "Темп", desc: "Тяни к поясу за 1 секунду, возвращай за 2 секунды (1-0-2)." }
-            ],
-            'bicep_curl': [
-                { title: "Дыхание", desc: "Выдох при сгибании, вдох при опускании." },
-                { title: "Локти", desc: "Держи локти плотно прижатыми к корпусу. Не разводи их в стороны." },
-                { title: "Темп", desc: "Поднимай за 1 секунду, опускай за 3 секунды (1-0-3)." }
-            ],
-            'tricep_pushdown': [
-                { title: "Дыхание", desc: "Выдох при разгибании, вдох при возвращении." },
-                { title: "Локти", desc: "Локти должны быть плотно прижаты к корпусу. Они работают как шарнир." },
-                { title: "Темп", desc: "Разгибай за 1 секунду, возвращай за 2 секунды (1-0-2)." }
-            ],
-            'leg_extension': [
-                { title: "Дыхание", desc: "Выдох при разгибании ног, вдох при опускании." },
-                { title: "Колени", desc: "Не отрывай таз от сиденья и полностью выпрямляй ноги в верхней точке." },
-                { title: "Темп", desc: "Разгибай за 1 секунду, опускай за 2 секунды (1-0-2)." }
-            ],
-            'glute_kickback': [
-                { title: "Дыхание", desc: "Выдох при отведении ноги назад, вдох при возвращении." },
-                { title: "Корпус", desc: "Спина должна быть ровной, не прогибай поясницу. Не делай рывков." },
-                { title: "Темп", desc: "Отводи ногу за 1.5 секунды, возвращай за 1.5 секунды (1.5-0-1.5)." }
-            ],
-            'woodchopper': [
-                { title: "Дыхание", desc: "Выдох при повороте корпуса, вдох при возвращении." },
-                { title: "Корпус", desc: "Движение должно идти от корпуса (бедер), а не от рук." },
-                { title: "Темп", desc: "Поворачивай за 1.5 секунды, возвращай за 2 секунды (1.5-0-2)." }
-            ]
-        };
-
-        // Функция для отображения советов на основе выбранного упражнения
-        function displayTips(exercise) {
-            const tipsContainer = document.getElementById('exerciseTips');
-            const tips = tipsData[exercise];
-            if (!tips) {
-                tipsContainer.innerHTML = "";
-                return;
-            }
-
-            let html = `<h4>💡 Советы от профессионалов (${exerciseSelect.options[exerciseSelect.selectedIndex].text})</h4><ul>`;
-            tips.forEach(tip => {
-                html += `<li><strong>${tip.title}:</strong> ${tip.desc}</li>`;
-            });
-            html += `</ul>`;
-            tipsContainer.innerHTML = html;
-        }
-
-        // Вызываем при загрузке и при смене упражнения
-        exerciseSelect.addEventListener('change', function() {
-            displayTips(this.value);
-        });
-        displayTips(exerciseSelect.value);
-
-        // ================= ОСТАЛЬНАЯ ЛОГИКА =================
-
+        // Исправленный обработчик для кнопок выбора повторений
+        const repButtonsContainer = document.getElementById('repButtonsContainer');
         let selectedRepRange = "8-10";
-        document.querySelectorAll('.rep-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
+
+        repButtonsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('rep-btn')) {
                 document.querySelectorAll('.rep-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                selectedRepRange = this.dataset.target;
-            });
+                e.target.classList.add('active');
+                selectedRepRange = e.target.dataset.target;
+            }
         });
 
+        // Калькулятор 1ПМ
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -237,6 +161,7 @@
             table.innerHTML = html;
         };
 
+        // Калькулятор Рабочего Веса
         document.getElementById('calc2Btn').onclick = function() {
             const oneRM = parseFloat(document.getElementById('workWeightBase').value);
             if (!oneRM || oneRM <= 0) { alert("Введите свой 1ПМ!"); return; }
@@ -250,7 +175,42 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // ================= ЛОГИКА АНАЛИЗА =================
+        // Логика советов (переписана надёжно)
+        const tipsData = {
+            'chest_press': ["💡 Дыхание: Вдох при опускании, выдох при жиме вверх.", "💡 Лопатки: Сведи лопатки и прижми к скамье.", "💡 Темп: Опускай за 2 сек, выжимай за 1 сек."],
+            'butterfly': ["💡 Дыхание: Выдох при сведении, вдох при возвращении.", "💡 Локти: Держи локти слегка согнутыми (15°).", "💡 Темп: Своди за 1 сек, разводи за 2 сек."],
+            'lat_pulldown': ["💡 Дыхание: Выдох при тяге вниз, вдох при возвращении.", "💡 Корпус: Наклонись чуть назад, таз прижат к скамье.", "💡 Темп: Тяни за 1 сек, опускай за 2 сек."],
+            'seated_row': ["💡 Дыхание: Выдох при тяге к поясу, вдох при возвращении.", "💡 Спина: Держи спину прямой, не округляй поясницу.", "💡 Темп: Тяни за 1 сек, возвращай за 2 сек."],
+            'bicep_curl': ["💡 Дыхание: Выдох при сгибании, вдох при опускании.", "💡 Локти: Прижми локти к корпусу.", "💡 Темп: Поднимай за 1 сек, опускай за 3 сек."],
+            'tricep_pushdown': ["💡 Дыхание: Выдох при разгибании, вдох при возвращении.", "💡 Локти: Прижми локти к корпусу.", "💡 Темп: Разгибай за 1 сек, возвращай за 2 сек."],
+            'leg_extension': ["💡 Дыхание: Выдох при разгибании, вдох при опускании.", "💡 Колени: Не отрывай таз, выпрямляй полностью.", "💡 Темп: Разгибай за 1 сек, опускай за 2 сек."],
+            'glute_kickback': ["💡 Дыхание: Выдох при отведении ноги, вдох при возвращении.", "💡 Корпус: Спина ровная, не прогибай поясницу.", "💡 Темп: Отводи за 1.5 сек, возвращай за 1.5 сек."],
+            'woodchopper': ["💡 Дыхание: Выдох при повороте корпуса, вдох при возвращении.", "💡 Корпус: Движение от бедер, а не от рук.", "💡 Темп: Поворачивай за 1.5 сек, возвращай за 2 сек."]
+        };
+
+        const exerciseSelect = document.getElementById('exerciseType');
+        const tipsContainer = document.getElementById('exerciseTips');
+
+        function displayTips() {
+            const exercise = exerciseSelect.value;
+            const tips = tipsData[exercise];
+            if (tips) {
+                let html = `<h4>💡 Советы от профессионалов</h4><ul>`;
+                tips.forEach(tip => {
+                    html += `<li>${tip}</li>`;
+                });
+                html += `</ul>`;
+                tipsContainer.innerHTML = html;
+            } else {
+                tipsContainer.innerHTML = "";
+            }
+        }
+
+        // Вызовем при загрузке и при смене
+        displayTips();
+        exerciseSelect.addEventListener('change', displayTips);
+
+        // Логика видео и анализа
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -264,16 +224,16 @@
         let techFrames = 0;
         let maxAngle = 0;
         let minAngle = 180;
-        let lastPhase = null;
         let repCount = 0;
         let qualityReps = 0;
+        let lastPhase = null;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
                 net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 192, multiplier: 0.75 });
-                statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
+                statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
                 console.error(error);
@@ -289,33 +249,31 @@
 
             if (exerciseSelect.value === 'lat_pulldown' || exerciseSelect.value === 'seated_row') {
                 if (maxAngle >= 160) {
-                    report += "✅ Полное растяжение (угол ~" + Math.round(maxAngle) + "°). Отлично для широчайших!\n";
+                    report += "✅ Полное растяжение (угол ~" + Math.round(maxAngle) + "°).\n";
                     score += 40;
                 } else if (maxAngle >= 140) {
                     report += "🟡 Почти полное растяжение.\n";
                     score += 20;
                 } else {
-                    report += "❌ Недостаточное растяжение. Поднимай руки выше!\n";
+                    report += "❌ Недостаточное растяжение.\n";
                     score += 5;
                 }
-
                 if (minAngle <= 90) {
-                    report += "✅ Полное сокращение (угол ~" + Math.round(minAngle) + "°). Отличный пик!\n";
+                    report += "✅ Полное сокращение (угол ~" + Math.round(minAngle) + "°).\n";
                     score += 40;
                 } else if (minAngle <= 110) {
                     report += "🟡 Почти полное сокращение.\n";
                     score += 20;
                 } else {
-                    report += "❌ Недостаточное сокращение. Тяни локти ниже!\n";
+                    report += "❌ Недостаточное сокращение.\n";
                     score += 5;
                 }
-            } 
-            else {
+            } else {
                 if (minAngle <= 90 && maxAngle >= 160) {
-                    report += "✅ Отличная амплитуда движения!\n";
+                    report += "✅ Отличная амплитуда!\n";
                     score = 80;
                 } else {
-                    report += "🟡 Средняя амплитуда. Попробуй добавить полный диапазон!\n";
+                    report += "🟡 Средняя амплитуда.\n";
                     score = 50;
                 }
             }
@@ -329,17 +287,14 @@
             const file = e.target.files[0];
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
-
-                if (!net) {
-                    await initPose();
-                }
+                if (!net) { await initPose(); }
 
                 techVideo.pause();
                 maxAngle = 0;
                 minAngle = 180;
-                lastPhase = null;
                 repCount = 0;
                 qualityReps = 0;
+                lastPhase = null;
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -385,7 +340,6 @@
                     [11,13], [13,15], [12,14], [14,16],
                     [5,6], [5,11], [6,12], [11,12]
                 ];
-                
                 techCtx.strokeStyle = '#00ff00'; techCtx.lineWidth = 4; techCtx.beginPath();
                 connections.forEach(([a,b]) => {
                     if (keypoints[a] && keypoints[b] && keypoints[a].position && keypoints[b].position) {
@@ -394,7 +348,6 @@
                     }
                 });
                 techCtx.stroke();
-
                 techCtx.fillStyle = '#ff9500';
                 for (let i = 0; i < keypoints.length; i++) {
                     if (keypoints[i] && keypoints[i].position) {
@@ -407,14 +360,10 @@
         }
 
         async function detectTechnique() {
-            if (techVideo.readyState < 2 || !net) {
-                requestAnimationFrame(detectTechnique);
-                return;
-            }
-
+            if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
             if (techFrames % 10 !== 0) { requestAnimationFrame(detectTechnique); return; }
-            
+
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
                 drawSkeleton(pose.keypoints);
