@@ -188,8 +188,8 @@
             try {
                 await tf.ready();
                 const model = poseDetection.SupportedModels.MoveNet;
-                // ВАЖНО: Просто строка, без объектов!
-                detector = await poseDetection.createDetector(model, { modelType: 'SINGLEPOSE_LIGHTNING' });
+                // ВАЖНО: НОВОЕ ПРАВИЛЬНОЕ НАЗВАНИЕ МОДЕЛИ
+                detector = await poseDetection.createDetector(model, { modelType: 'SinglePose.Lightning' });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
