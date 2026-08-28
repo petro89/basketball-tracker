@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
-    <!-- Используем только TensorFlow, который уже работает -->
+    <!-- Подключаем ЛОКАЛЬНУЮ библиотеку вместо CDN -->
+    <script src="./pose-detection.min.js"></script>
+    <!-- TensorFlow всё ещё нужен как база -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -171,7 +172,7 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // РАЗБОР ТЕХНИКИ НА MOVENET (работает через TensorFlow, который у тебя уже есть!)
+        // РАЗБОР ТЕХНИКИ НА MOVENET (локальная библиотека, работающая через TensorFlow)
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -188,12 +189,12 @@
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (MoveNet)...";
             try {
-                // Загружаем модель MoveNet (lightning - быстрая)
+                await tf.ready(); // Убеждаемся, что TensorFlow готов
                 const model = poseDetection.SupportedModels.MoveNet;
                 detector = await poseDetection.createDetector(model, { modelType: poseDetection.movenetModelType.SINGLEPOSE_LIGHTNING });
                 statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
             } catch (error) {
-                statusTech.innerText = "Ошибка загрузки ИИ. Проверь интернет.";
+                statusTech.innerText = "Ошибка загрузки: " + error.message;
                 console.error(error);
             }
         }
@@ -251,11 +252,10 @@
         function drawSkeleton(keypoints) {
             techCtx.clearRect(0, 0, techCanvas.width, techCanvas.height);
             if (keypoints && keypoints.length > 0) {
-                // Соединения для рук и ног
                 const connections = [
-                    [11,13], [13,15], [12,14], [14,16], // руки
-                    [23,25], [25,27], [24,26], [26,28], // ноги
-                    [11,12], [11,23], [12,24], [23,24]  // корпус
+                    [11,13], [13,15], [12,14], [14,16],
+                    [23,25], [25,27], [24,26], [26,28],
+                    [11,12], [11,23], [12,24], [23,24]
                 ];
                 
                 techCtx.strokeStyle = '#00ff00'; techCtx.lineWidth = 3; techCtx.beginPath();
