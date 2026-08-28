@@ -169,7 +169,7 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // ИСПРАВЛЕННАЯ ЛОГИКА РАЗБОРА ТЕХНИКИ
+        // РАЗБОР ТЕХНИКИ НА POSENET (ИСПРАВЛЕННАЯ ВЕРСИЯ)
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -182,9 +182,7 @@
 
         let net = null;
         let techFrames = 0;
-        let isProcessing = false;
 
-        // Инициализация нейросети (вызывается один раз)
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
@@ -197,32 +195,18 @@
             }
         }
 
-        // При выборе упражнения, если видео уже играет, просто сбрасываем счетчик
-        exerciseSelect.addEventListener('change', function() {
-            if (techVideo.readyState >= 2) {
-                statusTech.innerText = "Статус: Анализируем видео...";
-                techFrames = 0;
-            } else {
-                statusTech.innerText = "Статус: Выбери упражнение и загрузи видео.";
-            }
-        });
-
         uploadTechBtn.onclick = () => techUploadInput.click();
         techUploadInput.onchange = async function(e) {
             const file = e.target.files[0];
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
-                
-                // Инициализируем сеть только если она еще не загружена
+
+                // Загружаем сеть, если нужно
                 if (!net) {
                     await initPose();
                 }
-                
-                // Сбрасываем счетчик и флаг обработки
-                techFrames = 0;
-                isProcessing = false;
 
-                // Останавливаем предыдущее видео, если оно играло
+                // Останавливаем старое видео
                 techVideo.pause();
 
                 const url = URL.createObjectURL(file);
@@ -230,22 +214,18 @@
                 techVideo.srcObject = null;
                 techVideo.loop = true;
                 techVideo.muted = true;
-
-                // Запускаем видео как только оно готово
                 techVideo.play().catch(err => console.log("Автовоспроизведение заблокировано"));
 
-                // Ждем полной загрузки видео, затем запускаем анализ
                 techVideo.onloadedmetadata = () => {
                     techCanvas.width = techVideo.videoWidth || 640;
                     techCanvas.height = techVideo.videoHeight || 480;
                     seekTech.style.display = 'block';
                     playPauseTechBtn.style.display = 'block';
-                    
+                    techFrames = 0;
                     statusTech.innerText = "Статус: Анализируем видео...";
                     detectTechnique();
                 };
 
-                // Ползунок и пауза
                 seekTech.max = 100; seekTech.value = 0;
                 techVideo.addEventListener('timeupdate', () => { const progress = (techVideo.currentTime / techVideo.duration) * 100; seekTech.value = progress; seekTech.style.setProperty('--progress', progress + '%'); });
                 seekTech.addEventListener('input', () => { techVideo.currentTime = (seekTech.value / 100) * techVideo.duration; });
@@ -254,57 +234,88 @@
         };
 
         function calculateAngle(a, b, c) {
-            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
+            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
             let angle = Math.abs(radians * 180.0 / Math.PI);
             if (angle > 180.0) angle = 360 - angle;
             return angle;
         }
 
         function calculateScore(idealAngle, currentAngle) {
+            if (currentAngle === null) return null;
             let score = 100 - Math.abs(idealAngle - currentAngle) * 2;
             if (score < 0) score = 0;
             return Math.round(score);
         }
 
-        function getFeedback(landmarks) {
-            const lShoulder = landmarks[5], rShoulder = landmarks[6];
-            const lElbow = landmarks[7], rElbow = landmarks[8];
-            const lWrist = landmarks[9], rWrist = landmarks[10];
-            const lHip = landmarks[11], rHip = landmarks[12];
-            const lKnee = landmarks[13], rKnee = landmarks[14];
-            const lAnkle = landmarks[15], rAnkle = landmarks[16];
+        function getFeedback(keypoints) {
+            const lShoulder = keypoints[5], rShoulder = keypoints[6];
+            const lElbow = keypoints[7], rElbow = keypoints[8];
+            const lWrist = keypoints[9], rWrist = keypoints[10];
+            const lHip = keypoints[11], rHip = keypoints[12];
+            const lKnee = keypoints[13], rKnee = keypoints[14];
+            const lAnkle = keypoints[15], rAnkle = keypoints[16];
             const exercise = exerciseSelect.value;
-            let feedback = "";
+
+            // Проверяем, видит ли сеть ключевые точки
+            if (!lShoulder || !lElbow || !lWrist || !lShoulder.position || !lElbow.position || !lWrist.position) {
+                return "Не вижу руку в кадре. Повернись так, чтобы плечо, локоть и запястье были видны.";
+            }
+
             let angle = 0;
-            
-            if (exercise === 'chest_press' || exercise === 'lat_pulldown' || exercise === 'seated_row') {
+
+            if (exercise === 'chest_press') {
                 angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 90) feedback = "Опускай локти глубже (до ~90°). Оценка: " + calculateScore(90, angle);
-                else if (angle > 160) feedback = "Не выпрямляй локти до конца. Оценка: " + calculateScore(160, angle);
-                else feedback = "Угол локтя идеальный! Оценка: " + calculateScore(90, angle);
+                if (angle === null) return "Сеть потеряла руку. Попробуй изменить ракурс.";
+                if (angle < 90) return "Неполное сокращение: локти опущены недостаточно глубоко (ниже 90°). Оценка: " + calculateScore(90, angle);
+                if (angle > 160) return "Полное выпрямление: не выпрямляй локти до конца. Оценка: " + calculateScore(160, angle);
+                return "Идеальное сокращение! Оценка: " + calculateScore(90, angle);
+            }
+            else if (exercise === 'lat_pulldown' || exercise === 'seated_row') {
+                angle = calculateAngle(lShoulder, lElbow, lWrist);
+                if (angle === null) return "Сеть потеряла руку. Попробуй изменить ракурс.";
+                if (angle < 90) return "Неполное сокращение: тяни руку глубже (угол меньше 90°). Оценка: " + calculateScore(90, angle);
+                if (angle > 160) return "Полное растяжение: не выпрямляй руки полностью (до 180°). Оценка: " + calculateScore(160, angle);
+                return "Идеальная амплитуда! Оценка: " + calculateScore(90, angle);
             }
             else if (exercise === 'bicep_curl') {
                 angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 60) feedback = "Сгибай руку выше, до максимума! Оценка: " + calculateScore(60, angle);
-                else if (angle > 170) feedback = "Опускай руку полностью вниз. Оценка: " + calculateScore(170, angle);
-                else feedback = "Подъем выполняется верно! Оценка: " + calculateScore(60, angle);
+                if (angle === null) return "Сеть потеряла руку. Попробуй изменить ракурс.";
+                if (angle < 60) return "Неполное сокращение: сгибай руку сильнее (до 60°). Оценка: " + calculateScore(60, angle);
+                if (angle > 170) return "Полное растяжение: опусти руку полностью вниз (до 170°). Оценка: " + calculateScore(170, angle);
+                return "Идеальная амплитуда! Оценка: " + calculateScore(60, angle);
             }
             else if (exercise === 'tricep_pushdown') {
                 angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 50) feedback = "Разгибай руку полностью! Оценка: " + calculateScore(160, angle);
-                else if (angle > 170) feedback = "Опускай руку полностью вниз. Оценка: " + calculateScore(160, angle);
-                else feedback = "Трицепс работает верно! Оценка: " + calculateScore(160, angle);
+                if (angle === null) return "Сеть потеряла руку. Попробуй изменить ракурс.";
+                if (angle < 50) return "Неполное сокращение: разгибай руку больше. Оценка: " + calculateScore(160, angle);
+                if (angle > 170) return "Полное растяжение: контролируй движение вверх. Оценка: " + calculateScore(160, angle);
+                return "Идеальная амплитуда! Оценка: " + calculateScore(160, angle);
             }
             else if (exercise === 'leg_extension' || exercise === 'glute_kickback') {
                 angle = calculateAngle(lHip, lKnee, lAnkle);
-                if (angle < 90) feedback = "Разгибай колено сильнее! Оценка: " + calculateScore(160, angle);
-                else if (angle > 170) feedback = "Не разгибай колено до конца. Оценка: " + calculateScore(160, angle);
-                else feedback = "Нога работает верно! Оценка: " + calculateScore(160, angle);
+                if (angle === null) return "Сеть потеряла ногу. Попробуй изменить ракурс.";
+                if (angle < 90) return "Неполное сокращение: разгибай колено сильнее. Оценка: " + calculateScore(160, angle);
+                if (angle > 170) return "Полное растяжение: не разгибай колено до конца. Оценка: " + calculateScore(160, angle);
+                return "Идеальная амплитуда! Оценка: " + calculateScore(160, angle);
+            }
+            else if (exercise === 'butterfly') {
+                angle = calculateAngle(lShoulder, lElbow, lWrist);
+                if (angle === null) return "Сеть потеряла руку. Попробуй изменить ракурс.";
+                if (angle < 90) return "Неполное сведение: своди руки ближе. Оценка: " + calculateScore(90, angle);
+                if (angle > 160) return "Полное разведение: не раскрывай руки слишком широко. Оценка: " + calculateScore(160, angle);
+                return "Идеальное сведение! Оценка: " + calculateScore(90, angle);
+            }
+            else if (exercise === 'woodchopper') {
+                angle = calculateAngle(lShoulder, lElbow, lWrist);
+                if (angle === null) return "Сеть потеряла руку. Попробуй изменить ракурс.";
+                if (angle < 90) return "Неполное скручивание: поворачивай корпус сильнее. Оценка: " + calculateScore(90, angle);
+                if (angle > 160) return "Полное размахивание: контролируй темп. Оценка: " + calculateScore(160, angle);
+                return "Идеальное скручивание! Оценка: " + calculateScore(90, angle);
             }
             else {
                 return "Скелет построен. Анализируй углы на видео.";
             }
-            return feedback;
         }
 
         function drawSkeleton(keypoints) {
@@ -318,7 +329,7 @@
                 
                 techCtx.strokeStyle = '#00ff00'; techCtx.lineWidth = 3; techCtx.beginPath();
                 connections.forEach(([a,b]) => {
-                    if (keypoints[a] && keypoints[b]) {
+                    if (keypoints[a] && keypoints[b] && keypoints[a].position && keypoints[b].position && keypoints[a].score > 0.4 && keypoints[b].score > 0.4) {
                         techCtx.moveTo(keypoints[a].position.x * techCanvas.width, keypoints[a].position.y * techCanvas.height);
                         techCtx.lineTo(keypoints[b].position.x * techCanvas.width, keypoints[b].position.y * techCanvas.height);
                     }
@@ -327,47 +338,42 @@
 
                 techCtx.fillStyle = '#ff9500';
                 for (let i = 0; i < keypoints.length; i++) {
-                    if (keypoints[i]) {
+                    if (keypoints[i] && keypoints[i].position && keypoints[i].score > 0.4) {
                         techCtx.beginPath();
                         techCtx.arc(keypoints[i].position.x * techCanvas.width, keypoints[i].position.y * techCanvas.height, 5, 0, 2 * Math.PI);
                         techCtx.fill();
                     }
                 }
 
+                // Вывод угла
                 techCtx.fillStyle = '#ffffff';
                 techCtx.font = '16px Arial';
                 const exercise = exerciseSelect.value;
-                if (exercise === 'chest_press' || exercise === 'bicep_curl' || exercise === 'tricep_pushdown') {
-                    const angle = calculateAngle(keypoints[5], keypoints[7], keypoints[9]);
-                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[7].position.x * techCanvas.width + 10, keypoints[7].position.y * techCanvas.height + 10);
+                if (keypoints[7] && keypoints[7].position && keypoints[7].score > 0.4) {
+                    if (exercise === 'chest_press' || exercise === 'bicep_curl' || exercise === 'tricep_pushdown' || exercise === 'lat_pulldown' || exercise === 'seated_row') {
+                        const angle = calculateAngle(keypoints[5], keypoints[7], keypoints[9]);
+                        if (angle !== null) techCtx.fillText(angle.toFixed(0) + "°", keypoints[7].position.x * techCanvas.width + 10, keypoints[7].position.y * techCanvas.height + 10);
+                    }
                 }
-                if (exercise === 'lat_pulldown' || exercise === 'seated_row' || exercise === 'leg_extension' || exercise === 'glute_kickback') {
-                    const angle = calculateAngle(keypoints[11], keypoints[13], keypoints[15]);
-                    techCtx.fillText(angle.toFixed(0) + "°", keypoints[13].position.x * techCanvas.width + 10, keypoints[13].position.y * techCanvas.height + 10);
+                if (keypoints[13] && keypoints[13].position && keypoints[13].score > 0.4) {
+                    if (exercise === 'leg_extension' || exercise === 'glute_kickback') {
+                        const angle = calculateAngle(keypoints[11], keypoints[13], keypoints[15]);
+                        if (angle !== null) techCtx.fillText(angle.toFixed(0) + "°", keypoints[13].position.x * techCanvas.width + 10, keypoints[13].position.y * techCanvas.height + 10);
+                    }
                 }
+
                 statusTech.innerText = "Статус: " + getFeedback(keypoints);
             }
         }
 
         async function detectTechnique() {
-            // Если видео не готово или сеть не загружена, продолжаем ждать в фоновом режиме
-            if (techVideo.readyState < 2 || !net) {
-                requestAnimationFrame(detectTechnique);
-                return;
-            }
-            
+            if (techVideo.readyState < 2 || !net) return;
             techFrames++;
             if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
-            
-            try {
-                const pose = await net.estimateSinglePose(techVideo);
-                if (pose && pose.keypoints) {
-                    drawSkeleton(pose.keypoints);
-                }
-            } catch (error) {
-                console.error("Ошибка анализа:", error);
+            const pose = await net.estimateSinglePose(techVideo);
+            if (pose && pose.keypoints) {
+                drawSkeleton(pose.keypoints);
             }
-            
             requestAnimationFrame(detectTechnique);
         }
     </script>
