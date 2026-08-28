@@ -130,6 +130,7 @@
     </div>
 
     <script>
+        // Логика выбора диапазона повторений
         let selectedRepRange = "8-10";
         document.querySelectorAll('.rep-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -139,6 +140,7 @@
             });
         });
 
+        // Калькулятор 1ПМ
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -153,6 +155,7 @@
             table.innerHTML = html;
         };
 
+        // Калькулятор Рабочего Веса
         document.getElementById('calc2Btn').onclick = function() {
             const oneRM = parseFloat(document.getElementById('workWeightBase').value);
             if (!oneRM || oneRM <= 0) { alert("Введите свой 1ПМ!"); return; }
@@ -166,7 +169,7 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // РАЗБОР ТЕХНИКИ НА POSENET
+        // ИСПРАВЛЕННАЯ ЛОГИКА РАЗБОРА ТЕХНИКИ
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -179,7 +182,9 @@
 
         let net = null;
         let techFrames = 0;
+        let isProcessing = false;
 
+        // Инициализация нейросети (вызывается один раз)
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
@@ -192,30 +197,59 @@
             }
         }
 
+        // При выборе упражнения, если видео уже играет, просто сбрасываем счетчик
+        exerciseSelect.addEventListener('change', function() {
+            if (techVideo.readyState >= 2) {
+                statusTech.innerText = "Статус: Анализируем видео...";
+                techFrames = 0;
+            } else {
+                statusTech.innerText = "Статус: Выбери упражнение и загрузи видео.";
+            }
+        });
+
         uploadTechBtn.onclick = () => techUploadInput.click();
         techUploadInput.onchange = async function(e) {
             const file = e.target.files[0];
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
+                
+                // Инициализируем сеть только если она еще не загружена
+                if (!net) {
+                    await initPose();
+                }
+                
+                // Сбрасываем счетчик и флаг обработки
+                techFrames = 0;
+                isProcessing = false;
+
+                // Останавливаем предыдущее видео, если оно играло
+                techVideo.pause();
+
                 const url = URL.createObjectURL(file);
-                techVideo.src = url; techVideo.srcObject = null; techVideo.loop = true; techVideo.muted = true;
-                
-                // ЗАЩИТА ОТ ПАУЗЫ: Сразу ставим на автовоспроизведение и ждем метаданные
+                techVideo.src = url;
+                techVideo.srcObject = null;
+                techVideo.loop = true;
+                techVideo.muted = true;
+
+                // Запускаем видео как только оно готово
                 techVideo.play().catch(err => console.log("Автовоспроизведение заблокировано"));
-                
-                techVideo.onloadedmetadata = () => { 
-                    techCanvas.width = techVideo.videoWidth || 640; 
-                    techCanvas.height = techVideo.videoHeight || 480; 
-                    seekTech.style.display = 'block'; 
-                    playPauseTechBtn.style.display = 'block'; 
+
+                // Ждем полной загрузки видео, затем запускаем анализ
+                techVideo.onloadedmetadata = () => {
+                    techCanvas.width = techVideo.videoWidth || 640;
+                    techCanvas.height = techVideo.videoHeight || 480;
+                    seekTech.style.display = 'block';
+                    playPauseTechBtn.style.display = 'block';
+                    
+                    statusTech.innerText = "Статус: Анализируем видео...";
+                    detectTechnique();
                 };
+
+                // Ползунок и пауза
                 seekTech.max = 100; seekTech.value = 0;
                 techVideo.addEventListener('timeupdate', () => { const progress = (techVideo.currentTime / techVideo.duration) * 100; seekTech.value = progress; seekTech.style.setProperty('--progress', progress + '%'); });
                 seekTech.addEventListener('input', () => { techVideo.currentTime = (seekTech.value / 100) * techVideo.duration; });
                 playPauseTechBtn.onclick = () => { if (techVideo.paused) { techVideo.play(); playPauseTechBtn.innerText = "⏯ Пауза"; } else { techVideo.pause(); playPauseTechBtn.innerText = "▶ Играть"; } };
-                if (!net) await initPose();
-                techFrames = 0;
-                detectTechnique();
             }
         };
 
@@ -226,7 +260,6 @@
             return angle;
         }
 
-        // ОЦЕНКА ОТ 0 ДО 100 НА ОСНОВЕ УГЛА
         function calculateScore(idealAngle, currentAngle) {
             let score = 100 - Math.abs(idealAngle - currentAngle) * 2;
             if (score < 0) score = 0;
@@ -246,7 +279,6 @@
             
             if (exercise === 'chest_press' || exercise === 'lat_pulldown' || exercise === 'seated_row') {
                 angle = calculateAngle(lShoulder, lElbow, lWrist);
-                // Идеальный угол в нижней точке - 90 градусов
                 if (angle < 90) feedback = "Опускай локти глубже (до ~90°). Оценка: " + calculateScore(90, angle);
                 else if (angle > 160) feedback = "Не выпрямляй локти до конца. Оценка: " + calculateScore(160, angle);
                 else feedback = "Угол локтя идеальный! Оценка: " + calculateScore(90, angle);
@@ -272,7 +304,6 @@
             else {
                 return "Скелет построен. Анализируй углы на видео.";
             }
-            
             return feedback;
         }
 
@@ -319,13 +350,24 @@
         }
 
         async function detectTechnique() {
-            if (techVideo.readyState < 2) return;
+            // Если видео не готово или сеть не загружена, продолжаем ждать в фоновом режиме
+            if (techVideo.readyState < 2 || !net) {
+                requestAnimationFrame(detectTechnique);
+                return;
+            }
+            
             techFrames++;
             if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
-            const pose = await net.estimateSinglePose(techVideo);
-            if (pose && pose.keypoints) {
-                drawSkeleton(pose.keypoints);
+            
+            try {
+                const pose = await net.estimateSinglePose(techVideo);
+                if (pose && pose.keypoints) {
+                    drawSkeleton(pose.keypoints);
+                }
+            } catch (error) {
+                console.error("Ошибка анализа:", error);
             }
+            
             requestAnimationFrame(detectTechnique);
         }
     </script>
