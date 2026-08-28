@@ -8,13 +8,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-        body { min-height: 100vh; background: radial-gradient(circle at center, #1a1a25 0%, #06060e 70%); display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow-x: hidden; }
-        .card { background: linear-gradient(145deg, rgba(25, 25, 35, 0.95), rgba(10, 10, 20, 0.98)); border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 36px; padding: 25px 20px; max-width: 580px; width: 100%; text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2); margin-bottom: 20px; }
+        body { min-height: 100vh; background: radial-gradient(circle at center, #2a2a40 0%, #06060e 70%); display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow-x: hidden; }
+        .card { background: linear-gradient(145deg, rgba(30, 30, 45, 0.95), rgba(15, 15, 25, 0.98)); border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 36px; padding: 25px 20px; max-width: 580px; width: 100%; text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2); margin-bottom: 20px; }
         h1 { font-size: 26px; font-weight: 800; background: linear-gradient(90deg, #ff9500, #ffd000, #ff5e00, #ff9500); background-size: 300% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shine 5s linear infinite; margin-bottom: 8px; }
         @keyframes shine { to { background-position: 300% center; } }
         .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 12px; margin-bottom: 20px; }
         .nav-link { display: block; background: linear-gradient(135deg, #ff9500, #ff5e00); color: white; text-decoration: none; padding: 12px; border-radius: 18px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4); }
-        
+
         .video-container { width: 100%; height: 280px; border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 10px; position: relative; border: 2px solid rgba(255, 255, 255, 0.1); }
         video, canvas { width: 100%; height: 100%; object-fit: cover; }
         canvas { position: absolute; top: 0; left: 0; z-index: 10; }
@@ -22,7 +22,7 @@
         .custom-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 5px; outline: none; margin: 0 0 20px 0; cursor: pointer; }
         .custom-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #ff9500; border: 3px solid #fff; cursor: pointer; margin-top: -7px; }
         .custom-range::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: linear-gradient(to right, #ff9500 var(--progress, 0%), rgba(255, 255, 255, 0.2) var(--progress, 0%)); border-radius: 5px; }
-        
+
         .input-group { margin-bottom: 20px; text-align: left; }
         .input-group label { display: block; font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 10px; }
         .btn-group { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -34,16 +34,16 @@
         #aiStatusTech { font-size: 12px; color: #aaa; margin-bottom: 20px; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-left: 4px solid #ff9500; text-align: left; }
         input, select { width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0,0,0,0.5); color: white; font-family: inherit; font-size: 16px; outline: none; }
         select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ff9500' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; cursor: pointer; appearance: none; -webkit-appearance: none; }
+        /* СКРЫТИЕ СТРЕЛОЧЕК У ЧИСЛОВЫХ ПОЛЕЙ */
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
-        /* Стили для калькуляторов */
         .calc-section { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 20px; margin-bottom: 20px; }
         .calc-result { font-size: 40px; font-weight: 900; color: #ff9500; text-shadow: 0 0 15px rgba(255,149,0,0.3); margin: 10px 0; }
         .calc-table { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
         .calc-table div { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; }
         .calc-table div span { display: block; color: rgba(255,255,255,0.5); font-size: 10px; margin-bottom: 5px; }
         .calc-table div strong { color: #fff; font-size: 16px; }
-
-        /* Стили для второго калькулятора */
         .rep-buttons { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         .rep-btn { flex: 1; padding: 10px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); background: transparent; color: white; font-size: 14px; cursor: pointer; transition: all 0.3s; }
         .rep-btn.active { background: linear-gradient(135deg, #ff9500, #ff5e00); border-color: transparent; box-shadow: 0 5px 15px rgba(255,149,0,0.4); }
@@ -56,7 +56,6 @@
     <div class="card">
         <h1>Gym Technique & Calculators</h1>
         <p class="subtitle">ИИ-разбор и расчет весов</p>
-
         <a href="index.html" class="nav-link">🏀 Вернуться к Броскам и Прыжкам</a>
 
         <!-- Калькулятор 1ПМ -->
@@ -147,20 +146,13 @@
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
             if (!w || !r || r <= 0) { alert("Введите вес и повторения!"); return; }
-
             const oneRM = w * (1 + r / 30);
             document.getElementById('calc1RM').innerText = Math.round(oneRM) + " кг";
-
-            // Автозаполнение второго калькулятора
             document.getElementById('workWeightBase').value = Math.round(oneRM);
-
-            // Таблица процентов для 1ПМ
             const table = document.getElementById('calcTable1');
             const percentages = [0.9, 0.8, 0.75, 0.7, 0.65, 0.6, 0.5];
             let html = "";
-            percentages.forEach(p => {
-                html += `<div><span>${Math.round(p*100)}%</span><strong>${Math.round(oneRM * p)} кг</strong></div>`;
-            });
+            percentages.forEach(p => { html += `<div><span>${Math.round(p*100)}%</span><strong>${Math.round(oneRM * p)} кг</strong></div>`; });
             table.innerHTML = html;
         };
 
@@ -168,20 +160,17 @@
         document.getElementById('calc2Btn').onclick = function() {
             const oneRM = parseFloat(document.getElementById('workWeightBase').value);
             if (!oneRM || oneRM <= 0) { alert("Введите свой 1ПМ!"); return; }
-
-            // Коэффициенты для разных диапазонов повторений
             let coef = 0.75;
             if (selectedRepRange === "8-10") coef = 0.75;
             else if (selectedRepRange === "6-8") coef = 0.8;
             else if (selectedRepRange === "10-12") coef = 0.7;
             else if (selectedRepRange === "12-15") coef = 0.65;
             else if (selectedRepRange === "15-20") coef = 0.6;
-
             const workWeight = oneRM * coef;
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // Разбор техники (логика без изменений)
+        // Разбор техники
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -199,7 +188,11 @@
             statusTech.innerText = "Статус: Загружаем ИИ для разбора техники...";
             const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
             poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate: "GPU" },
+                baseOptions: { 
+                    // ЛОКАЛЬНАЯ МОДЕЛЬ: она лежит рядом с этим файлом и загружается мгновенно
+                    modelAssetPath: "./pose_landmarker_lite.task", 
+                    delegate: "GPU" 
+                },
                 runningMode: "VIDEO",
                 numPoses: 1
             });
@@ -240,18 +233,8 @@
             const lAnkle = landmarks[27], rAnkle = landmarks[28];
             const exercise = exerciseSelect.value;
             let feedback = "";
-            if (exercise === 'chest_press') {
-                const angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 90) feedback = "Опускай локти глубже (до ~90°)";
-                else if (angle > 160) feedback = "Не выпрямляй локти до конца";
-                else feedback = "Жим выполняется верно!";
-            }
-            else if (exercise === 'bicep_curl') {
-                const angle = calculateAngle(lShoulder, lElbow, lWrist);
-                if (angle < 60) feedback = "Сгибай руку выше, до максимума!";
-                else if (angle > 170) feedback = "Опускай руку полностью вниз";
-                else feedback = "Подъем выполняется верно!";
-            }
+            if (exercise === 'chest_press') { const angle = calculateAngle(lShoulder, lElbow, lWrist); if (angle < 90) feedback = "Опускай локти глубже (до ~90°)"; else if (angle > 160) feedback = "Не выпрямляй локти до конца"; else feedback = "Жим выполняется верно!"; }
+            else if (exercise === 'bicep_curl') { const angle = calculateAngle(lShoulder, lElbow, lWrist); if (angle < 60) feedback = "Сгибай руку выше, до максимума!"; else if (angle > 170) feedback = "Опускай руку полностью вниз"; else feedback = "Подъем выполняется верно!"; }
             else { return "Скелет построен. Анализируй углы на видео."; }
             return feedback;
         }

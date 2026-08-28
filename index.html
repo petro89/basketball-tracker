@@ -10,115 +10,79 @@
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-        body { min-height: 100vh; background: radial-gradient(circle at center, #1a1a25 0%, #06060e 70%); display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow-x: hidden; }
-        
-        /* Исправлено: теперь страница может прокручиваться вниз */
-        .card {
-            position: relative;
-            background: linear-gradient(145deg, rgba(25, 25, 35, 0.95), rgba(10, 10, 20, 0.98));
-            border: 2px solid rgba(255, 255, 255, 0.15);
-            border-radius: 36px;
-            padding: 25px 20px;
-            max-width: 580px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2);
-            animation: popIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            margin-bottom: 20px;
-        }
-
-        .nav-link {
-            display: block;
-            background: linear-gradient(135deg, #a855f7, #7c3aed);
-            color: white;
-            text-decoration: none;
-            padding: 12px;
-            border-radius: 18px;
-            margin-bottom: 20px;
-            font-weight: 600;
-            box-shadow: 0 5px 15px rgba(168, 85, 247, 0.4);
-            transition: all 0.3s;
-        }
-        .nav-link:active { transform: scale(0.95); }
-
+        body { min-height: 100vh; background: radial-gradient(circle at center, #2a2a40 0%, #06060e 70%); display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow-x: hidden; }
+        .card { position: relative; background: linear-gradient(145deg, rgba(30, 30, 45, 0.95), rgba(15, 15, 25, 0.98)); border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 36px; padding: 25px 20px; max-width: 580px; width: 100%; text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2); margin-bottom: 20px; }
+        .nav-link { display: block; background: linear-gradient(135deg, #a855f7, #7c3aed); color: white; text-decoration: none; padding: 12px; border-radius: 18px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 5px 15px rgba(168, 85, 247, 0.4); }
         h1 { font-size: 26px; font-weight: 800; background: linear-gradient(90deg, #ff9500, #ffd000, #ff5e00, #ff9500); background-size: 300% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shine 5s linear infinite; margin-bottom: 8px; }
         @keyframes shine { to { background-position: 300% center; } }
-
         .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 12px; margin-bottom: 20px; }
-
         .tabs { display: flex; background: rgba(0, 0, 0, 0.4); border-radius: 50px; padding: 5px; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.1); }
-        .tab-btn { flex: 1; padding: 12px; font-size: 12px; font-weight: 600; border: none; background: transparent; color: rgba(255, 255, 255, 0.6); cursor: pointer; border-radius: 40px; transition: all 0.3s; }
+        .tab-btn { flex: 1; padding: 12px; font-size: 12px; font-weight: 600; border: none; background: transparent; color: rgba(255, 255, 255, 0.6); cursor: pointer; border-radius: 40px; }
         .tab-btn.active { background: linear-gradient(135deg, #ff9500, #ff5e00); color: white; box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4); }
         .content-section { display: none; }
         .content-section.active { display: block; }
-
         .video-container { width: 100%; height: 280px; border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 10px; position: relative; border: 2px solid rgba(255, 255, 255, 0.1); }
         video, canvas { width: 100%; height: 100%; object-fit: cover; }
         canvas { position: absolute; top: 0; left: 0; z-index: 10; }
-
         .pause-btn { background: linear-gradient(135deg, #555, #333); border-radius: 10px; padding: 10px 15px; font-size: 14px; width: 100%; margin-bottom: 15px; }
         .custom-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 5px; outline: none; margin: 0 0 20px 0; cursor: pointer; }
         .custom-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #ff9500; border: 3px solid #fff; cursor: pointer; margin-top: -7px; }
         .custom-range::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: linear-gradient(to right, #ff9500 var(--progress, 0%), rgba(255, 255, 255, 0.2) var(--progress, 0%)); border-radius: 5px; }
-
         .input-group { margin-bottom: 20px; text-align: left; }
         .input-group label { display: block; font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 10px; }
         .btn-group { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        
-        button { position: relative; padding: 14px 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 18px; cursor: pointer; transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease; color: white; font-family: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button { position: relative; padding: 14px 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 18px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; color: white; font-family: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
         button:active { transform: scale(0.9); }
         button:hover { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 25px var(--glow-color, rgba(255,255,255,0.2)); }
-
         #startAiBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
         #uploadBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
-        #jumpCameraBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
-        #jumpStandBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
+        #switchCameraBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
+        #stopCameraBtn { --glow-color: rgba(220, 53, 69, 0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
+        #jumpCameraBtn, #jumpStandBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
         #jumpGoBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
         #uploadJumpBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
-
         .btn-hit { --glow-color: rgba(40, 167, 69, 0.6); background: linear-gradient(135deg, #28a745, #1e7e34); }
         .btn-miss { --glow-color: rgba(220, 53, 69, 0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
-
         .basketball-icon { width: 26px; height: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); transition: transform 0.4s; }
-        .btn-hit:hover .basketball-icon { transform: rotate(360deg) scale(1.2); }
         .miss-icon { width: 18px; height: 18px; fill: white; }
-
         #aiStatus, #aiStatusJump { font-size: 12px; color: #aaa; margin-bottom: 20px; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-left: 4px solid #ff9500; text-align: left; }
-
         .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; margin-top: 10px; }
         .stat-box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 20px 10px; position: relative; overflow: hidden; }
         .stat-box::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, #ff9500, transparent); }
         .stat-box h2 { font-size: 40px; font-weight: 900; line-height: 1; }
         .stat-box span { font-size: 10px; color: rgba(255, 255, 255, 0.6); display: block; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
-
         input, select { width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0,0,0,0.5); color: white; font-family: inherit; font-size: 16px; outline: none; }
-        input:focus, select:focus { border-color: #ff9500; }
         select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ff9500' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; cursor: pointer; appearance: none; -webkit-appearance: none; }
-
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
         .chart-container { height: 300px; background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 20px; margin-bottom: 20px; position: relative; }
 
-        @media (max-width: 600px) {
-            body { padding: 10px; }
-            .card { padding: 15px 12px; border-radius: 24px; }
-            .tab-btn { font-size: 10px; padding: 10px; }
-            .video-container { height: 200px; }
-            .btn-group { gap: 8px; margin-bottom: 15px; }
-            button { padding: 12px 15px; font-size: 14px; }
-            .stats { gap: 8px; }
-            .stat-box { padding: 15px 5px; }
-            .stat-box h2 { font-size: 28px; }
-            .chart-container { height: 250px; }
-        }
+        /* НОВАЯ ИНТЕРАКТИВНАЯ ПЛОЩАДКА */
+        .court-map-container { width: 100%; margin-bottom: 20px; margin-top: 20px; }
+        .court-toolbar { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+        .court-toolbar button { padding: 8px 15px; font-size: 13px; }
+        #courtHitMode { --glow-color: rgba(40,167,69,0.6); background: linear-gradient(135deg, #28a745, #1e7e34); }
+        #courtMissMode { --glow-color: rgba(220,53,69,0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
+        .court-toolbar button.active-mode { transform: scale(1.05); box-shadow: 0 0 15px var(--glow-color); border: 2px solid white; }
+        .court-canvas { width: 100%; border-radius: 16px; overflow: hidden; position: relative; border: 2px solid rgba(255,255,255,0.1); }
+        svg { display: block; width: 100%; height: auto; background: radial-gradient(circle at center, #1e1e33 0%, #12121f 100%); }
+        .court-line { stroke: #ff9500; stroke-width: 2.5; fill: none; stroke-linecap: round; }
+        .court-arc { stroke: #00c2ff; stroke-width: 2; fill: none; stroke-dasharray: 4,4; }
+        .court-hoop-rim { stroke: #ff3b30; stroke-width: 4; fill: none; }
+        .court-backboard { fill: rgba(255,255,255,0.2); stroke: #fff; stroke-width: 2; }
+        .court-net { stroke: rgba(255,255,255,0.7); stroke-width: 1.5; fill: none; }
+        .shot-marker { cursor: pointer; pointer-events: none; }
+        .shot-text { font-family: 'Unbounded', sans-serif; font-size: 12px; fill: white; font-weight: 700; pointer-events: none; }
+        .court-reset-btn { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); width: 100%; margin-top: 10px; }
+
+        @media (max-width: 600px) { body { padding: 10px; } .card { padding: 15px 12px; border-radius: 24px; } .tab-btn { font-size: 10px; padding: 10px; } .video-container { height: 200px; } button { padding: 12px 15px; font-size: 14px; } .stats { gap: 8px; } .stat-box { padding: 15px 5px; } .stat-box h2 { font-size: 28px; } .court-toolbar button { font-size: 11px; padding: 6px 10px; } }
     </style>
 </head>
 <body>
-
     <div class="card">
         <h1>Basketball Tracker Pro</h1>
         <p class="subtitle">Твой комплексный спортивный помощник</p>
-
         <a href="gym.html" class="nav-link">🏋️ Перейти в Зал (Анализ техники)</a>
-
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('shooting')">Счётчик</button>
             <button class="tab-btn" onclick="switchTab('jump')">Прыжок</button>
@@ -127,392 +91,175 @@
         </div>
 
         <div id="shooting-section" class="content-section active">
-            <div class="video-container">
-                <video id="cameraFeed" autoplay playsinline muted></video>
-                <canvas id="overlayCanvas"></canvas>
-            </div>
-            
-            <button id="playPauseVideo" class="pause-btn" style="display: none;">⏯ Пауза</button>
-            <input type="range" id="seekVideo" class="custom-range" min="0" max="100" value="0" style="display: none;">
-            <input type="file" id="videoUpload" accept="video/*" style="display: none;">
-
+            <div class="video-container"><video id="cameraFeed" autoplay playsinline muted></video><canvas id="overlayCanvas"></canvas></div>
+            <button id="playPauseVideo" class="pause-btn" style="display:none;">⏯ Пауза</button>
+            <input type="range" id="seekVideo" class="custom-range" min="0" max="100" value="0" style="display:none;">
+            <input type="file" id="videoUpload" accept="video/*" style="display:none;">
             <div class="input-group">
-                <label>Высота кольца (в см, обычно 305)</label>
-                <input type="number" id="hoopHeight" placeholder="305">
-                <label style="margin-top: 10px;">Твоя досягаемость стоя (в см, например 231)</label>
-                <input type="number" id="reachHeight" placeholder="231">
-                <label style="margin-top: 10px;">Выбор камеры</label>
-                <select id="cameraSelectShooting">
-                    <option value="user">Фронтальная</option>
-                    <option value="environment">Основная (задняя)</option>
-                </select>
-                <label style="margin-top: 10px;">Качество записи (FPS)</label>
-                <select id="fpsShoot">
-                    <option value="30">30 FPS (Экономия)</option>
-                    <option value="60" selected>60 FPS (Максимум)</option>
-                </select>
+                <label>Высота кольца (в см, обычно 305)</label><input type="number" id="hoopHeight" placeholder="305">
+                <label style="margin-top:10px;">Твоя досягаемость стоя (в см, например 231)</label><input type="number" id="reachHeight" placeholder="231">
+                <label style="margin-top:10px;">Выбор камеры</label>
+                <select id="cameraSelectShooting"><option value="user">Фронтальная</option><option value="environment">Основная (задняя)</option></select>
+                <label style="margin-top:10px;">Качество записи (FPS)</label>
+                <select id="fpsShoot"><option value="30">30 FPS (Экономия)</option><option value="60" selected>60 FPS (Максимум)</option></select>
             </div>
-
             <div class="btn-group">
                 <button id="startAiBtn">Загрузить ИИ и камеру</button>
+                <button id="switchCameraBtn" style="display:none;">Сменить камеру</button>
+                <button id="stopCameraBtn" style="display:none;">Выключить камеру</button>
                 <button id="uploadBtn">Загрузить видео</button>
             </div>
-
             <div id="aiStatus">Статус: Введи данные и включи камеру.</div>
+
+            <!-- ИНТЕРАКТИВНАЯ ПЛОЩАДКА (НОВАЯ ВЕРСИЯ) -->
+            <div class="court-map-container">
+                <h3 style="color:#ff9500; margin-bottom:10px; font-size:14px;">Карта бросков (ручной ввод)</h3>
+                <div class="court-toolbar">
+                    <button id="courtHitMode" class="active-mode">Попал</button>
+                    <button id="courtMissMode">Мимо</button>
+                </div>
+                <div class="court-canvas" id="courtCanvas">
+                    <svg id="basketballCourt" viewBox="0 0 300 220">
+                        <!-- Фон площадки -->
+                        <rect x="0" y="0" width="300" height="220" fill="url(#courtGrad)"/>
+                        <defs>
+                            <linearGradient id="courtGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#1e1e33"/>
+                                <stop offset="100%" stop-color="#12121f"/>
+                            </linearGradient>
+                        </defs>
+                        
+                        <!-- Основание и линии -->
+                        <path class="court-line" d="M 10 20 L 290 20 L 290 200 L 10 200 Z" />
+                        <path class="court-line" d="M 10 200 L 290 200" />
+                        
+                        <!-- Трехочковая дуга -->
+                        <path class="court-arc" d="M 30 20 L 30 60 Q 30 140, 150 140 Q 270 140, 270 60 L 270 20" />
+                        
+                        <!-- Штрафная зона -->
+                        <rect x="110" y="20" width="80" height="100" fill="rgba(255,255,255,0.03)" />
+                        <path class="court-line" d="M 110 20 L 110 120 M 190 20 L 190 120" />
+                        <circle class="court-line" cx="150" cy="120" r="10" />
+                        
+                        <!-- Кольцо и щит -->
+                        <rect class="court-backboard" x="120" y="8" width="60" height="15" />
+                        <circle class="court-hoop-rim" cx="150" cy="30" r="8" />
+                        
+                        <!-- Сетка -->
+                        <path class="court-net" d="M 143 35 L 147 45 L 153 45 L 157 35 M 146 38 L 150 48 L 154 38 M 149 40 L 153 50" />
+                        
+                        <!-- Центральный круг -->
+                        <circle class="court-line" cx="150" cy="180" r="18" />
+                    </svg>
+                </div>
+                <button class="court-reset-btn" onclick="resetCourt()">Сбросить карту</button>
+            </div>
+            <!-- КОНЕЦ ПЛОЩАДКИ -->
 
             <div class="stats">
                 <div class="stat-box"><h2 id="hits">0</h2><span>Попадания</span></div>
                 <div class="stat-box"><h2 id="total">0</h2><span>Всего</span></div>
                 <div class="stat-box"><h2 id="percent">0%</h2><span>Точность</span></div>
             </div>
-
-            <div style="display: flex; gap: 12px; margin-bottom: 15px;">
+            <div style="display:flex; gap:12px; margin-bottom:15px;">
                 <button id="hitBtn" class="btn-hit"><svg class="basketball-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#f68a1e" stroke="#8c4308" stroke-width="1.5"/><path d="M12 2 V22" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><path d="M2 12 H22" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><path d="M4.5 5 C 8 8, 8 16, 4.5 19" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><path d="M19.5 5 C 16 8, 16 16, 19.5 19" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="9" r="2.5" fill="rgba(255,255,255,0.2)"/></svg> Попал</button>
                 <button id="missBtn" class="btn-miss"><svg class="miss-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> Мимо</button>
             </div>
-
-            <button id="resetBtn" style="background: transparent; border: 2px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.8); width: 100%; margin-top: 10px;">Сбросить всё</button>
-            <button class="btn-group" onclick="logShootingData()" style="background: #28a745; width: 100%; margin-top: 15px; padding: 14px;">Записать сегодняшний % в историю</button>
+            <button id="resetBtn" style="background:transparent; border:2px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.8); width:100%; margin-top:10px;">Сбросить всё</button>
+            <button onclick="logShootingData()" style="background:#28a745; width:100%; margin-top:15px; padding:14px;">Записать сегодняшний % в историю</button>
         </div>
 
         <div id="jump-section" class="content-section">
-            <div class="video-container">
-                <video id="jumpFeed" autoplay playsinline muted></video>
-                <canvas id="jumpCanvas"></canvas>
-            </div>
-            <button id="playPauseJump" class="pause-btn" style="display: none;">⏯ Пауза</button>
-            <input type="range" id="seekJump" class="custom-range" min="0" max="100" value="0" style="display: none;">
-            <input type="file" id="jumpUpload" accept="video/*" style="display: none;">
-
+            <div class="video-container"><video id="jumpFeed" autoplay playsinline muted></video><canvas id="jumpCanvas"></canvas></div>
+            <button id="playPauseJump" class="pause-btn" style="display:none;">⏯ Пауза</button>
+            <input type="range" id="seekJump" class="custom-range" min="0" max="100" value="0" style="display:none;">
+            <input type="file" id="jumpUpload" accept="video/*" style="display:none;">
             <div class="input-group">
-                <label>Твой точный рост (в см)</label>
-                <input type="number" id="userHeight" placeholder="180">
+                <label>Твой точный рост (в см)</label><input type="number" id="userHeight" placeholder="180">
             </div>
-
             <div class="input-group">
                 <label>Тип прыжка</label>
-                <select id="jumpType">
-                    <option value="standing">С места (камера спереди)</option>
-                    <option value="runup">С разбега (камера сбоку)</option>
-                    <option value="dunk">Данк (по мячу)</option>
-                </select>
-                <label style="margin-top: 10px;">Выбор камеры</label>
-                <select id="cameraSelectJump">
-                    <option value="user">Фронтальная</option>
-                    <option value="environment">Основная (задняя)</option>
-                </select>
-                <label style="margin-top: 10px;">Качество записи (FPS)</label>
-                <select id="fpsJump">
-                    <option value="30">30 FPS (Экономия)</option>
-                    <option value="60" selected>60 FPS (Максимум)</option>
-                </select>
+                <select id="jumpType"><option value="standing">С места (камера спереди)</option><option value="runup">С разбега (камера сбоку)</option><option value="dunk">Данк (по мячу)</option></select>
+                <label style="margin-top:10px;">Выбор камеры</label>
+                <select id="cameraSelectJump"><option value="user">Фронтальная</option><option value="environment">Основная (задняя)</option></select>
+                <label style="margin-top:10px;">Качество записи (FPS)</label>
+                <select id="fpsJump"><option value="30">30 FPS (Экономия)</option><option value="60" selected>60 FPS (Максимум)</option></select>
             </div>
-
             <div class="btn-group">
-                <button id="jumpCameraBtn" style="background: linear-gradient(135deg, #00c2ff, #0082ff);">Включить камеру</button>
-                <button id="uploadJumpBtn" style="background: linear-gradient(135deg, #a855f7, #7c3aed);">Загрузить видео</button>
+                <button id="jumpCameraBtn">Включить камеру</button>
+                <button id="uploadJumpBtn">Загрузить видео</button>
             </div>
-
             <div class="btn-group">
                 <button id="jumpStandBtn" disabled style="background: linear-gradient(135deg, #00c2ff, #0082ff);">Калибровка</button>
                 <button id="jumpGoBtn" disabled style="background: linear-gradient(135deg, #ff9500, #ff5e00);">Прыгай!</button>
             </div>
-
             <div id="aiStatusJump">Статус: Введи рост и включи камеру.</div>
-
-            <div class="stats">
-                <div class="stat-box"><h2 id="jumpResult">0</h2><span>Прыжок (в см)</span></div>
-            </div>
-
-            <button onclick="logJumpData()" style="background: #28a745; width: 100%; margin-top: 15px; padding: 14px;">Записать прыжок в историю</button>
+            <div class="stats"><div class="stat-box"><h2 id="jumpResult">0</h2><span>Прыжок (в см)</span></div></div>
+            <button onclick="logJumpData()" style="background:#28a745; width:100%; margin-top:15px; padding:14px;">Записать прыжок в историю</button>
         </div>
 
         <div id="profile-section" class="content-section">
-            <div class="input-group">
-                <label>Рост (в см)</label><input type="number" id="profileHeight" placeholder="180">
-                <label style="margin-top: 10px;">Вес (в кг)</label><input type="number" id="profileWeight" placeholder="75">
-                <label style="margin-top: 10px;">Максимальная точка касания стоя (в см)</label><input type="number" id="profileReach" placeholder="231">
-                <label style="margin-top: 10px;">Актуальный прыжок (в см)</label><input type="number" id="profileJump" placeholder="70">
-            </div>
-            <button onclick="saveProfile()" style="background: #28a745; width: 100%; margin-top: 15px; padding: 14px;">Сохранить мои данные</button>
-            <div id="profileStatus" style="font-size: 12px; color: #ff9500; margin-top: 10px;"></div>
+            <div class="input-group"><label>Рост (в см)</label><input type="number" id="profileHeight" placeholder="180"><label style="margin-top:10px;">Вес (в кг)</label><input type="number" id="profileWeight" placeholder="75"><label style="margin-top:10px;">Максимальная точка касания стоя (в см)</label><input type="number" id="profileReach" placeholder="231"><label style="margin-top:10px;">Актуальный прыжок (в см)</label><input type="number" id="profileJump" placeholder="70"></div>
+            <button onclick="saveProfile()" style="background:#28a745; width:100%; margin-top:15px; padding:14px;">Сохранить мои данные</button>
+            <div id="profileStatus" style="font-size:12px; color:#ff9500; margin-top:10px;"></div>
         </div>
 
         <div id="history-section" class="content-section">
             <div class="chart-container"><canvas id="trendChart"></canvas></div>
-            <div id="historyList" style="font-size: 14px; color: rgba(255,255,255,0.6); text-align: left; max-height: 200px; overflow-y: auto;"></div>
+            <div id="historyList" style="font-size:14px; color:rgba(255,255,255,0.6); text-align:left; max-height:200px; overflow-y:auto;"></div>
         </div>
-
     </div>
 
     <script>
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
-            const tabs = ['shooting', 'jump', 'profile', 'history'];
-            const index = tabs.indexOf(tab);
-            document.querySelectorAll('.tab-btn')[index].classList.add('active');
-            document.getElementById(tab + '-section').classList.add('active');
-            if (tab === 'profile') loadProfile();
-            if (tab === 'history') renderHistory();
-        }
+        function switchTab(tab) { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.content-section').forEach(s=>s.classList.remove('active')); const tabs=['shooting','jump','profile','history']; document.querySelectorAll('.tab-btn')[tabs.indexOf(tab)].classList.add('active'); document.getElementById(tab+'-section').classList.add('active'); if(tab==='profile') loadProfile(); if(tab==='history') renderHistory(); }
+        function saveProfile() { const h=document.getElementById('profileHeight').value; const w=document.getElementById('profileWeight').value; const r=document.getElementById('profileReach').value; const j=document.getElementById('profileJump').value; localStorage.setItem('btp_height',h); localStorage.setItem('btp_weight',w); localStorage.setItem('btp_reach',r); localStorage.setItem('btp_jump',j); addHistoryEntry('weight',w); addHistoryEntry('jump',j); addHistoryEntry('height',h); addHistoryEntry('reach',r); document.getElementById('profileStatus').innerText="Данные сохранены!"; setTimeout(()=>document.getElementById('profileStatus').innerText="",2000); }
+        function loadProfile() { document.getElementById('profileHeight').value=localStorage.getItem('btp_height')||''; document.getElementById('profileWeight').value=localStorage.getItem('btp_weight')||''; document.getElementById('profileReach').value=localStorage.getItem('btp_reach')||''; document.getElementById('profileJump').value=localStorage.getItem('btp_jump')||''; document.getElementById('userHeight').value=localStorage.getItem('btp_height')||''; document.getElementById('reachHeight').value=localStorage.getItem('btp_reach')||''; }
+        function getHistory() { return localStorage.getItem('btp_history')?JSON.parse(localStorage.getItem('btp_history')):[]; }
+        function addHistoryEntry(type,value) { const history=getHistory(); const today=new Date().toLocaleDateString('ru-RU'); let last=history[history.length-1]; if(!last||last.date!==today) { last={date:today,weight:null,jump:null,shooting:null,height:null,reach:null}; history.push(last); } if(type==='weight')last.weight=value; if(type==='jump')last.jump=value; if(type==='shooting')last.shooting=value; if(type==='height')last.height=value; if(type==='reach')last.reach=value; localStorage.setItem('btp_history',JSON.stringify(history)); }
+        function logShootingData() { addHistoryEntry('shooting',parseFloat(document.getElementById('percent').innerText)||0); alert("Записано!"); }
+        function logJumpData() { addHistoryEntry('jump',parseFloat(document.getElementById('jumpResult').innerText)||0); alert("Записано!"); }
+        let myChart=null;
+        function renderHistory() { const history=getHistory(); const ctx=document.getElementById('trendChart').getContext('2d'); if(myChart)myChart.destroy(); const labels=history.map(e=>e.date); const w=history.map(e=>e.weight?parseFloat(e.weight):null); const j=history.map(e=>e.jump?parseFloat(e.jump):null); const s=history.map(e=>e.shooting?parseFloat(e.shooting):null); const h=history.map(e=>e.height?parseFloat(e.height):null); const r=history.map(e=>e.reach?parseFloat(e.reach):null); myChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:[{label:'Вес (кг)',data:w,borderColor:'#00c2ff',tension:0.4,spanGaps:true},{label:'Прыжок (см)',data:j,borderColor:'#ff9500',tension:0.4,spanGaps:true},{label:'Точность (%)',data:s,borderColor:'#28a745',tension:0.4,spanGaps:true},{label:'Рост (см)',data:h,borderColor:'#ffd000',borderDash:[5,5],tension:0.1,spanGaps:true},{label:'Досягаемость (см)',data:r,borderColor:'#ff5e00',borderDash:[5,5],tension:0.1,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'white',font:{family:'Unbounded',size:12}}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.6)'},grid:{color:'rgba(255,255,255,0.1)'}},y:{ticks:{color:'rgba(255,255,255,0.6)'},grid:{color:'rgba(255,255,255,0.1)'}}}}}); document.getElementById('historyList').innerHTML=history.slice().reverse().map(e=>`<div style="margin-bottom:10px;"><strong style="color:#ff9500;">${e.date}:</strong> Вес: ${e.weight||'-'}кг | Прыжок: ${e.jump||'-'}см | Точность: ${e.shooting||'-'}% | Рост: ${e.height||'-'}см | Досягаемость: ${e.reach||'-'}см</div>`).join(''); }
 
-        function saveProfile() {
-            const h = document.getElementById('profileHeight').value;
-            const w = document.getElementById('profileWeight').value;
-            const r = document.getElementById('profileReach').value;
-            const j = document.getElementById('profileJump').value;
-            localStorage.setItem('btp_height', h); localStorage.setItem('btp_weight', w);
-            localStorage.setItem('btp_reach', r); localStorage.setItem('btp_jump', j);
-            addHistoryEntry('weight', w); addHistoryEntry('jump', j);
-            addHistoryEntry('height', h); addHistoryEntry('reach', r);
-            document.getElementById('profileStatus').innerText = "Данные сохранены!";
-            setTimeout(() => document.getElementById('profileStatus').innerText = "", 2000);
-        }
+        function animateBall() { const icon = document.querySelector('#hitBtn .basketball-icon'); if (!icon) return; icon.style.transform='rotate(0deg)'; void icon.offsetWidth; icon.style.transition='transform 0.3s ease'; icon.style.transform='rotate(360deg)'; }
 
-        function loadProfile() {
-            document.getElementById('profileHeight').value = localStorage.getItem('btp_height') || '';
-            document.getElementById('profileWeight').value = localStorage.getItem('btp_weight') || '';
-            document.getElementById('profileReach').value = localStorage.getItem('btp_reach') || '';
-            document.getElementById('profileJump').value = localStorage.getItem('btp_jump') || '';
-            document.getElementById('userHeight').value = localStorage.getItem('btp_height') || '';
-            document.getElementById('reachHeight').value = localStorage.getItem('btp_reach') || '';
-        }
+        // ИНТЕРАКТИВНАЯ КАРТА
+        const courtCanvas=document.getElementById('courtCanvas'); const svg=document.getElementById('basketballCourt'); let courtMode='hit'; const courtMapData={};
+        document.getElementById('courtHitMode').onclick=()=>{courtMode='hit'; document.getElementById('courtHitMode').classList.add('active-mode'); document.getElementById('courtMissMode').classList.remove('active-mode');};
+        document.getElementById('courtMissMode').onclick=()=>{courtMode='miss'; document.getElementById('courtMissMode').classList.add('active-mode'); document.getElementById('courtHitMode').classList.remove('active-mode');};
+        courtCanvas.addEventListener('click', function(e) { const rect=courtCanvas.getBoundingClientRect(); const scaleX=300/rect.width; const scaleY=220/rect.height; const x=Math.round((e.clientX-rect.left)*scaleX); const y=Math.round((e.clientY-rect.top)*scaleY); const gridX=Math.floor(x/20)*20; const gridY=Math.floor(y/20)*20; const key=`${gridX}-${gridY}`; if(!courtMapData[key]) courtMapData[key]={hits:0,misses:0}; if(courtMode==='hit') { courtMapData[key].hits++; hits++; total++; } else { courtMapData[key].misses++; total++; } updateStats(); renderCourtMap(); });
+        function renderCourtMap() { document.querySelectorAll('.shot-marker, .shot-text').forEach(el=>el.remove()); for(const key in courtMapData) { const data=courtMapData[key]; const [x,y]=key.split('-').map(Number); const text=data.hits>0&&data.misses>0?`${data.hits}/${data.misses}`:(data.hits>0?`${data.hits}`:`${data.misses}`); const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('class','shot-marker'); circle.setAttribute('cx',x+10); circle.setAttribute('cy',y+10); circle.setAttribute('r','8'); if(data.hits>data.misses||(data.hits>0&&data.misses===0)) circle.setAttribute('fill','rgba(40,167,69,0.8)'); else circle.setAttribute('fill','rgba(220,53,69,0.8)'); circle.setAttribute('stroke','white'); circle.setAttribute('stroke-width','1.5'); svg.appendChild(circle); const textEl=document.createElementNS('http://www.w3.org/2000/svg','text'); textEl.setAttribute('class','shot-text'); textEl.setAttribute('x',x+10); textEl.setAttribute('y',y+14); textEl.setAttribute('text-anchor','middle'); textEl.textContent=text; svg.appendChild(textEl); } }
+        function resetCourt() { for(const key in courtMapData) delete courtMapData[key]; renderCourtMap(); }
 
-        function getHistory() { return localStorage.getItem('btp_history') ? JSON.parse(localStorage.getItem('btp_history')) : []; }
+        document.getElementById('hitBtn').onclick=function(){hits++; total++; updateStats(); animateBall();};
+        document.getElementById('missBtn').onclick=function(){total++; updateStats();};
+        document.getElementById('resetBtn').onclick=function(){hits=0; total=0; updateStats();};
 
-        function addHistoryEntry(type, value) {
-            const history = getHistory();
-            const today = new Date().toLocaleDateString('ru-RU');
-            let last = history[history.length - 1];
-            if (!last || last.date !== today) last = { date: today, weight: null, jump: null, shooting: null, height: null, reach: null }, history.push(last);
-            if(type === 'weight') last.weight = value;
-            if(type === 'jump') last.jump = value;
-            if(type === 'shooting') last.shooting = value;
-            if(type === 'height') last.height = value;
-            if(type === 'reach') last.reach = value;
-            localStorage.setItem('btp_history', JSON.stringify(history));
-        }
+        let hits=0,total=0;
+        function updateStats() { document.getElementById('hits').innerText=hits; document.getElementById('total').innerText=total; document.getElementById('percent').innerText=(total===0?0:Math.round((hits/total)*100))+'%'; }
 
-        function logShootingData() { addHistoryEntry('shooting', parseFloat(document.getElementById('percent').innerText) || 0); alert("Записано!"); }
-        function logJumpData() { addHistoryEntry('jump', parseFloat(document.getElementById('jumpResult').innerText) || 0); alert("Записано!"); }
+        const video=document.getElementById('cameraFeed'); const canvas=document.getElementById('overlayCanvas'); const ctx=canvas.getContext('2d'); const startBtn=document.getElementById('startAiBtn'); const switchCameraBtn=document.getElementById('switchCameraBtn'); const stopCameraBtn=document.getElementById('stopCameraBtn'); const uploadBtn=document.getElementById('uploadBtn'); const videoUploadInput=document.getElementById('videoUpload'); const statusEl=document.getElementById('aiStatus'); const seekVideo=document.getElementById('seekVideo'); const playPauseVideoBtn=document.getElementById('playPauseVideo'); const cameraSelectShooting=document.getElementById('cameraSelectShooting'); const fpsShoot=document.getElementById('fpsShoot');
+        let model,hoopBox,ballInHoop=false,aiActive=false,userReach=231,hoopHeightCM=305,detectionThrottleShoot=2,currentStream=null;
+        function updateHoopBox(){const vh=video.videoHeight; hoopBox={x:(video.videoWidth/2)-30,y:vh-(vh/(hoopHeightCM/userReach))-70,width:60,height:60};}
+        async function startCamera(){if(currentStream) currentStream.getTracks().forEach(track=>track.stop()); const facingMode=cameraSelectShooting.value; const fps=parseInt(fpsShoot.value); detectionThrottleShoot=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); currentStream=stream; video.srcObject=stream; video.muted=true; video.play().then(()=>{canvas.width=video.videoWidth||640; canvas.height=video.videoHeight||480;}); return stream;}
+        startBtn.onclick=async function(){seekVideo.style.display='none'; playPauseVideoBtn.style.display='none'; statusEl.innerText="Статус: Включаем камеру..."; try{await startCamera(); statusEl.innerText="Статус: Камера работает. Загружаем нейросеть..."; if(!model) model=await cocoSsd.load(); aiActive=true; statusEl.innerText="Статус: ИИ готов!"; startBtn.style.display='none'; switchCameraBtn.style.display='block'; stopCameraBtn.style.display='block'; detectFrame();}catch(error){statusEl.innerText="Ошибка камеры."; console.error(error);}};
+        switchCameraBtn.onclick=async function(){statusEl.innerText="Статус: Переключаем камеру..."; await startCamera(); statusEl.innerText="Статус: Камера переключена!";};
+        stopCameraBtn.onclick=function(){if(currentStream) currentStream.getTracks().forEach(track=>track.stop()); currentStream=null; video.srcObject=null; aiActive=false; statusEl.innerText="Статус: Камера выключена."; startBtn.style.display='block'; switchCameraBtn.style.display='none'; stopCameraBtn.style.display='none';};
+        uploadBtn.onclick=()=>videoUploadInput.click();
+        videoUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){statusEl.innerText="Статус: Загружаем видео..."; const url=URL.createObjectURL(file); video.src=url; video.srcObject=null; video.loop=true; video.muted=true; video.play(); video.onloadedmetadata=()=>{canvas.width=video.videoWidth; canvas.height=video.videoHeight; seekVideo.style.display='block'; playPauseVideoBtn.style.display='block';}; seekVideo.max=100; seekVideo.value=0; video.addEventListener('timeupdate',()=>{const p=(video.currentTime/video.duration)*100; seekVideo.value=p; seekVideo.style.setProperty('--progress',p+'%');}); seekVideo.addEventListener('input',()=>{video.currentTime=(seekVideo.value/100)*video.duration;}); playPauseVideoBtn.onclick=()=>{if(video.paused){video.play(); playPauseVideoBtn.innerText="⏯ Пауза";}else{video.pause(); playPauseVideoBtn.innerText="▶ Играть";}}; hits=0; total=0; updateStats(); hoopBox=null; if(!model)model=await cocoSsd.load(); aiActive=true; detectFrame();}};
+        let frameCounter=0;
+        async function detectFrame(){if(!aiActive)return; frameCounter++; if(frameCounter%detectionThrottleShoot!==0){requestAnimationFrame(detectFrame); return;} const predictions=await model.detect(video); ctx.clearRect(0,0,canvas.width,canvas.height); updateHoopBox(); if(hoopBox){ctx.strokeStyle='rgba(0,255,0,0.5)'; ctx.lineWidth=3; ctx.setLineDash([5,5]); ctx.strokeRect(hoopBox.x,hoopBox.y,hoopBox.width,hoopBox.height); ctx.setLineDash([]);} for(let i=0;i<predictions.length;i++){const p=predictions[i]; if(p.class==='sports ball'){ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.strokeRect(p.bbox[0],p.bbox[1],p.bbox[2],p.bbox[3]); if(hoopBox){const bx=p.bbox[0]+p.bbox[2]/2, by=p.bbox[1]+p.bbox[3]/2; const isInside=bx>hoopBox.x&&bx<hoopBox.x+hoopBox.width&&by>hoopBox.y&&by<hoopBox.y+hoopBox.height; if(isInside&&!ballInHoop){hits++; total++; updateStats(); ballInHoop=true;} else if(!isInside) ballInHoop=false;}}} requestAnimationFrame(detectFrame);}
 
-        let myChart = null;
-        function renderHistory() {
-            const history = getHistory();
-            const ctx = document.getElementById('trendChart').getContext('2d');
-            if (myChart) myChart.destroy();
-            const labels = history.map(e => e.date);
-            const w = history.map(e => e.weight ? parseFloat(e.weight) : null);
-            const j = history.map(e => e.jump ? parseFloat(e.jump) : null);
-            const s = history.map(e => e.shooting ? parseFloat(e.shooting) : null);
-            const h = history.map(e => e.height ? parseFloat(e.height) : null);
-            const r = history.map(e => e.reach ? parseFloat(e.reach) : null);
-            myChart = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [
-                { label: 'Вес (кг)', data: w, borderColor: '#00c2ff', tension: 0.4, spanGaps: true },
-                { label: 'Прыжок (см)', data: j, borderColor: '#ff9500', tension: 0.4, spanGaps: true },
-                { label: 'Точность (%)', data: s, borderColor: '#28a745', tension: 0.4, spanGaps: true },
-                { label: 'Рост (см)', data: h, borderColor: '#ffd000', borderDash: [5,5], tension: 0.1, spanGaps: true },
-                { label: 'Досягаемость (см)', data: r, borderColor: '#ff5e00', borderDash: [5,5], tension: 0.1, spanGaps: true }
-            ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white', font: { family: 'Unbounded', size: 12 } } } }, scales: { x: { ticks: { color: 'rgba(255,255,255,0.6)' }, grid: { color: 'rgba(255,255,255,0.1)' } }, y: { ticks: { color: 'rgba(255,255,255,0.6)' }, grid: { color: 'rgba(255,255,255,0.1)' } } } } });
-            document.getElementById('historyList').innerHTML = history.slice().reverse().map(e => `<div style="margin-bottom:10px;"><strong style="color:#ff9500;">${e.date}:</strong> Вес: ${e.weight || '-'}кг | Прыжок: ${e.jump || '-'}см | Точность: ${e.shooting || '-'}% | Рост: ${e.height || '-'}см | Досягаемость: ${e.reach || '-'}см</div>`).join('');
-        }
-
-        let hits = 0, total = 0;
-        function updateStats() {
-            document.getElementById('hits').innerText = hits;
-            document.getElementById('total').innerText = total;
-            document.getElementById('percent').innerText = (total === 0 ? 0 : Math.round((hits / total) * 100)) + '%';
-        }
-        document.getElementById('hitBtn').onclick = function() { hits++; total++; updateStats(); };
-        document.getElementById('missBtn').onclick = function() { total++; updateStats(); };
-        document.getElementById('resetBtn').onclick = function() { hits = 0; total = 0; updateStats(); };
-
-        const video = document.getElementById('cameraFeed');
-        const canvas = document.getElementById('overlayCanvas');
-        const ctx = canvas.getContext('2d');
-        const startBtn = document.getElementById('startAiBtn');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const videoUploadInput = document.getElementById('videoUpload');
-        const statusEl = document.getElementById('aiStatus');
-        const seekVideo = document.getElementById('seekVideo');
-        const playPauseVideoBtn = document.getElementById('playPauseVideo');
-        const cameraSelectShooting = document.getElementById('cameraSelectShooting');
-        const fpsShoot = document.getElementById('fpsShoot');
-
-        let model, hoopBox, ballInHoop = false, aiActive = false, userReach = 231, hoopHeightCM = 305, detectionThrottleShoot = 2;
-
-        function updateHoopBox() {
-            const vh = video.videoHeight;
-            hoopBox = { x: (video.videoWidth / 2) - 30, y: vh - (vh / (hoopHeightCM / userReach)) - 70, width: 60, height: 60 };
-        }
-
-        startBtn.onclick = async function() {
-            seekVideo.style.display = 'none';
-            playPauseVideoBtn.style.display = 'none';
-            statusEl.innerText = "Статус: Включаем камеру...";
-            try {
-                const facingMode = cameraSelectShooting.value;
-                const fps = parseInt(fpsShoot.value);
-                detectionThrottleShoot = fps === 60 ? 3 : 2;
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, frameRate: { ideal: fps, max: fps } } });
-                video.srcObject = stream;
-                video.muted = true;
-                video.play().then(() => { canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480; });
-                statusEl.innerText = "Статус: Камера работает. Загружаем нейросеть...";
-                if (!model) model = await cocoSsd.load();
-                aiActive = true;
-                statusEl.innerText = "Статус: ИИ готов! Двигай камеру, чтобы рамка попалась на кольцо.";
-                startBtn.style.display = 'none';
-                detectFrame();
-            } catch (error) { statusEl.innerText = "Ошибка камеры. Проверь разрешения."; console.error(error); }
-        };
-
-        uploadBtn.onclick = () => videoUploadInput.click();
-        videoUploadInput.onchange = async function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const url = URL.createObjectURL(file);
-                video.src = url; video.srcObject = null; video.loop = true; video.muted = true; video.play();
-                video.onloadedmetadata = () => { canvas.width = video.videoWidth; canvas.height = video.videoHeight; seekVideo.style.display = 'block'; playPauseVideoBtn.style.display = 'block'; };
-                seekVideo.max = 100; seekVideo.value = 0;
-                video.addEventListener('timeupdate', () => { const p = (video.currentTime / video.duration) * 100; seekVideo.value = p; seekVideo.style.setProperty('--progress', p + '%'); });
-                seekVideo.addEventListener('input', () => { video.currentTime = (seekVideo.value / 100) * video.duration; });
-                playPauseVideoBtn.onclick = () => { if (video.paused) { video.play(); playPauseVideoBtn.innerText = "⏯ Пауза"; } else { video.pause(); playPauseVideoBtn.innerText = "▶ Играть"; } };
-                hits = 0; total = 0; updateStats(); hoopBox = null;
-                if (!model) model = await cocoSsd.load();
-                aiActive = true; statusEl.innerText = "Статус: ИИ готов! Двигай камеру, чтобы рамка попалась на кольцо.";
-                detectFrame();
-            }
-        };
-
-        let frameCounter = 0;
-        async function detectFrame() {
-            if (!aiActive) return;
-            frameCounter++;
-            if (frameCounter % detectionThrottleShoot !== 0) { requestAnimationFrame(detectFrame); return; }
-            const predictions = await model.detect(video);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            updateHoopBox();
-            if (hoopBox) { ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)'; ctx.lineWidth = 3; ctx.setLineDash([5, 5]); ctx.strokeRect(hoopBox.x, hoopBox.y, hoopBox.width, hoopBox.height); ctx.setLineDash([]); }
-            for (let i = 0; i < predictions.length; i++) {
-                const p = predictions[i];
-                if (p.class === 'sports ball') {
-                    ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 2; ctx.strokeRect(p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]);
-                    if (hoopBox) {
-                        const bx = p.bbox[0] + p.bbox[2] / 2, by = p.bbox[1] + p.bbox[3] / 2;
-                        const isInside = bx > hoopBox.x && bx < hoopBox.x + hoopBox.width && by > hoopBox.y && by < hoopBox.y + hoopBox.height;
-                        if (isInside && !ballInHoop) { hits++; total++; updateStats(); ballInHoop = true; }
-                        else if (!isInside) ballInHoop = false;
-                    }
-                }
-            }
-            requestAnimationFrame(detectFrame);
-        }
-
-        // --- ПРЫЖОК ---
-        const jumpVideo = document.getElementById('jumpFeed');
-        const jumpCanvas = document.getElementById('jumpCanvas');
-        const jumpCtx = jumpCanvas.getContext('2d');
-        const jumpCameraBtn = document.getElementById('jumpCameraBtn');
-        const jumpStandBtn = document.getElementById('jumpStandBtn');
-        const jumpGoBtn = document.getElementById('jumpGoBtn');
-        const jumpUploadBtn = document.getElementById('uploadJumpBtn');
-        const jumpUploadInput = document.getElementById('jumpUpload');
-        const statusJump = document.getElementById('aiStatusJump');
-        const jumpResultEl = document.getElementById('jumpResult');
-        const jumpTypeSelect = document.getElementById('jumpType');
-        const seekJump = document.getElementById('seekJump');
-        const playPauseJumpBtn = document.getElementById('playPauseJump');
-        const cameraSelectJump = document.getElementById('cameraSelectJump');
-        const fpsJump = document.getElementById('fpsJump');
-
-        let jumpModel = null, standingBox = null, userRealHeight = 180, isJumping = false, currentJumpMode = 'standing', detectionThrottleJump = 2;
-
-        jumpTypeSelect.addEventListener('change', function() {
-            currentJumpMode = this.value;
-            if (currentJumpMode === 'runup') statusJump.innerText = "Статус: Поставь телефон СБОКУ (на 90 градусов) для точного замера с разбега!";
-            else if (currentJumpMode === 'dunk') statusJump.innerText = "Статус: Наведи камеру на мяч в руках. Будем мерить высоту мяча!";
-            else statusJump.innerText = "Статус: Камера должна быть перед тобой.";
-        });
-
-        jumpCameraBtn.onclick = async function() {
-            seekJump.style.display = 'none';
-            playPauseJumpBtn.style.display = 'none';
-            statusJump.innerText = "Статус: Включаем камеру...";
-            try {
-                const facingMode = cameraSelectJump.value;
-                const fps = parseInt(fpsJump.value);
-                detectionThrottleJump = fps === 60 ? 3 : 2;
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, frameRate: { ideal: fps, max: fps } } });
-                jumpVideo.srcObject = stream; jumpVideo.muted = true;
-                jumpVideo.play().then(() => { jumpCanvas.width = jumpVideo.videoWidth || 640; jumpCanvas.height = jumpVideo.videoHeight || 480; });
-                statusJump.innerText = "Статус: Камера работает. Загружаем нейросеть...";
-                if (!jumpModel) jumpModel = await cocoSsd.load();
-                jumpStandBtn.disabled = false; jumpGoBtn.disabled = true;
-                statusJump.innerText = "Статус: Камера готова. Нажми 'Калибровка'.";
-            } catch (error) { statusJump.innerText = "Ошибка камеры."; console.error(error); }
-        };
-
-        jumpUploadBtn.onclick = () => jumpUploadInput.click();
-        jumpUploadInput.onchange = async function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const url = URL.createObjectURL(file);
-                jumpVideo.src = url; jumpVideo.srcObject = null; jumpVideo.loop = true; jumpVideo.muted = true; jumpVideo.play();
-                jumpVideo.onloadedmetadata = () => { jumpCanvas.width = jumpVideo.videoWidth; jumpCanvas.height = jumpVideo.videoHeight; seekJump.style.display = 'block'; playPauseJumpBtn.style.display = 'block'; };
-                seekJump.max = 100; seekJump.value = 0;
-                jumpVideo.addEventListener('timeupdate', () => { const p = (jumpVideo.currentTime / jumpVideo.duration) * 100; seekJump.value = p; seekJump.style.setProperty('--progress', p + '%'); });
-                seekJump.addEventListener('input', () => { jumpVideo.currentTime = (seekJump.value / 100) * jumpVideo.duration; });
-                playPauseJumpBtn.onclick = () => { if (jumpVideo.paused) { jumpVideo.play(); playPauseJumpBtn.innerText = "⏯ Пауза"; } else { jumpVideo.pause(); playPauseJumpBtn.innerText = "▶ Играть"; } };
-                statusJump.innerText = "Статус: Загружено. Выбери тип прыжка и нажми 'Калибровка'.";
-                jumpStandBtn.disabled = false; jumpGoBtn.disabled = true; isJumping = false; standingBox = null;
-                if (!jumpModel) jumpModel = await cocoSsd.load();
-            }
-        };
-
-        jumpStandBtn.onclick = async function() {
-            userRealHeight = parseFloat(document.getElementById('userHeight').value) || 180;
-            statusJump.innerText = "Статус: Калибруемся...";
-            if (!jumpModel) jumpModel = await cocoSsd.load();
-            const predictions = await jumpModel.detect(jumpVideo);
-            let foundUser = false, foundBall = false;
-            for (let i = 0; i < predictions.length; i++) {
-                if (predictions[i].class === 'person' && !foundUser) { standingBox = predictions[i].bbox; foundUser = true; }
-                if (predictions[i].class === 'sports ball') { standingBox = predictions[i].bbox; foundBall = true; }
-            }
-            if (currentJumpMode === 'dunk') {
-                if (foundBall) { statusJump.innerText = "Статус: Мяч найден! Теперь прыгай и делай данк!"; jumpGoBtn.disabled = false; jumpStandBtn.disabled = true; }
-                else { statusJump.innerText = "Статус: Мяч не найден в кадре."; jumpStandBtn.disabled = false; }
-            } else {
-                if (foundUser) { statusJump.innerText = "Статус: Ты отлично стоишь! Нажми 'Прыгай!'"; jumpGoBtn.disabled = false; jumpStandBtn.disabled = true; }
-                else { statusJump.innerText = "Статус: Не вижу тебя в кадре."; jumpStandBtn.disabled = false; }
-            }
-        };
-
-        jumpGoBtn.onclick = function() {
-            statusJump.innerText = "Статус: Прыгай!"; jumpGoBtn.disabled = true; isJumping = true; jumpResultEl.innerText = "0";
-            detectJump();
-        };
-
-        let jumpFrameCounter = 0;
-        async function detectJump() {
-            if (!isJumping) return;
-            jumpFrameCounter++;
-            if (jumpFrameCounter % detectionThrottleJump !== 0) { requestAnimationFrame(detectJump); return; }
-            const predictions = await jumpModel.detect(jumpVideo);
-            let currentBox = null;
-            for (let i = 0; i < predictions.length; i++) {
-                if (currentJumpMode === 'dunk') { if (predictions[i].class === 'sports ball') { currentBox = predictions[i].bbox; break; } }
-                else { if (predictions[i].class === 'person') { currentBox = predictions[i].bbox; break; } }
-            }
-            if (currentBox && standingBox) {
-                const pixelJump = standingBox[1] - currentBox[1];
-                const cm = (userRealHeight / standingBox[3]) * pixelJump;
-                if (cm > 0) jumpResultEl.innerText = Math.round(cm);
-            }
-            requestAnimationFrame(detectJump);
-        }
+        const jumpVideo=document.getElementById('jumpFeed'); const jumpCanvas=document.getElementById('jumpCanvas'); const jumpCtx=jumpCanvas.getContext('2d'); const jumpCameraBtn=document.getElementById('jumpCameraBtn'); const jumpStandBtn=document.getElementById('jumpStandBtn'); const jumpGoBtn=document.getElementById('jumpGoBtn'); const jumpUploadBtn=document.getElementById('uploadJumpBtn'); const jumpUploadInput=document.getElementById('jumpUpload'); const statusJump=document.getElementById('aiStatusJump'); const jumpResultEl=document.getElementById('jumpResult'); const jumpTypeSelect=document.getElementById('jumpType'); const seekJump=document.getElementById('seekJump'); const playPauseJumpBtn=document.getElementById('playPauseJump'); const cameraSelectJump=document.getElementById('cameraSelectJump'); const fpsJump=document.getElementById('fpsJump');
+        let jumpModel=null,standingBox=null,userRealHeight=180,isJumping=false,currentJumpMode='standing',detectionThrottleJump=2;
+        jumpTypeSelect.addEventListener('change',function(){currentJumpMode=this.value; if(currentJumpMode==='runup')statusJump.innerText="Статус: Поставь телефон СБОКУ."; else if(currentJumpMode==='dunk')statusJump.innerText="Статус: Наведи камеру на мяч."; else statusJump.innerText="Статус: Камера перед тобой.";});
+        jumpCameraBtn.onclick=async function(){seekJump.style.display='none'; playPauseJumpBtn.style.display='none'; statusJump.innerText="Статус: Включаем камеру..."; try{const facingMode=cameraSelectJump.value; const fps=parseInt(fpsJump.value); detectionThrottleJump=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); jumpVideo.srcObject=stream; jumpVideo.muted=true; jumpVideo.play().then(()=>{jumpCanvas.width=jumpVideo.videoWidth||640; jumpCanvas.height=jumpVideo.videoHeight||480;}); if(!jumpModel) jumpModel=await cocoSsd.load(); jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; statusJump.innerText="Статус: Нажми 'Калибровка'.";}catch(error){statusJump.innerText="Ошибка камеры.";}};
+        jumpUploadBtn.onclick=()=>jumpUploadInput.click();
+        jumpUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){const url=URL.createObjectURL(file); jumpVideo.src=url; jumpVideo.srcObject=null; jumpVideo.loop=true; jumpVideo.muted=true; jumpVideo.play(); jumpVideo.onloadedmetadata=()=>{jumpCanvas.width=jumpVideo.videoWidth; jumpCanvas.height=jumpVideo.videoHeight; seekJump.style.display='block'; playPauseJumpBtn.style.display='block';}; seekJump.max=100; seekJump.value=0; jumpVideo.addEventListener('timeupdate',()=>{const p=(jumpVideo.currentTime/jumpVideo.duration)*100; seekJump.value=p; seekJump.style.setProperty('--progress',p+'%');}); seekJump.addEventListener('input',()=>{jumpVideo.currentTime=(seekJump.value/100)*jumpVideo.duration;}); playPauseJumpBtn.onclick=()=>{if(jumpVideo.paused){jumpVideo.play(); playPauseJumpBtn.innerText="⏯ Пауза";}else{jumpVideo.pause(); playPauseJumpBtn.innerText="▶ Играть";}}; statusJump.innerText="Статус: Нажми 'Калибровка'."; jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; isJumping=false; standingBox=null; if(!jumpModel) jumpModel=await cocoSsd.load();}};
+        jumpStandBtn.onclick=async function(){userRealHeight=parseFloat(document.getElementById('userHeight').value)||180; statusJump.innerText="Статус: Калибруемся..."; if(!jumpModel)jumpModel=await cocoSsd.load(); const predictions=await jumpModel.detect(jumpVideo); let foundUser=false,foundBall=false; for(let i=0;i<predictions.length;i++){if(predictions[i].class==='person'&&!foundUser){standingBox=predictions[i].bbox; foundUser=true;} if(predictions[i].class==='sports ball'){standingBox=predictions[i].bbox; foundBall=true;}} if(currentJumpMode==='dunk'){if(foundBall){statusJump.innerText="Статус: Мяч найден! Прыгай!"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Мяч не найден.";} else {if(foundUser){statusJump.innerText="Статус: Стоишь! Нажми 'Прыгай!'"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Не вижу тебя.";}};
+        jumpGoBtn.onclick=function(){statusJump.innerText="Статус: Прыгай!"; jumpGoBtn.disabled=true; isJumping=true; jumpResultEl.innerText="0"; detectJump();};
+        let jumpFrameCounter=0;
+        async function detectJump(){if(!isJumping)return; jumpFrameCounter++; if(jumpFrameCounter%detectionThrottleJump!==0){requestAnimationFrame(detectJump); return;} const predictions=await jumpModel.detect(jumpVideo); let currentBox=null; for(let i=0;i<predictions.length;i++){if(currentJumpMode==='dunk'){if(predictions[i].class==='sports ball'){currentBox=predictions[i].bbox; break;}} else {if(predictions[i].class==='person'){currentBox=predictions[i].bbox; break;}}} if(currentBox&&standingBox){const pixelJump=standingBox[1]-currentBox[1]; const cm=(userRealHeight/standingBox[3])*pixelJump; if(cm>0)jumpResultEl.innerText=Math.round(cm);} requestAnimationFrame(detectJump);}
 
         loadProfile();
     </script>
