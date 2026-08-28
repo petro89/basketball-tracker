@@ -134,10 +134,8 @@
     </div>
 
     <script>
-        // Исправленный обработчик для кнопок выбора повторений
         const repButtonsContainer = document.getElementById('repButtonsContainer');
         let selectedRepRange = "8-10";
-
         repButtonsContainer.addEventListener('click', function(e) {
             if (e.target.classList.contains('rep-btn')) {
                 document.querySelectorAll('.rep-btn').forEach(b => b.classList.remove('active'));
@@ -146,7 +144,6 @@
             }
         });
 
-        // Калькулятор 1ПМ
         document.getElementById('calc1Btn').onclick = function() {
             const w = parseFloat(document.getElementById('calcWeight').value);
             const r = parseInt(document.getElementById('calcReps').value);
@@ -161,7 +158,6 @@
             table.innerHTML = html;
         };
 
-        // Калькулятор Рабочего Веса
         document.getElementById('calc2Btn').onclick = function() {
             const oneRM = parseFloat(document.getElementById('workWeightBase').value);
             if (!oneRM || oneRM <= 0) { alert("Введите свой 1ПМ!"); return; }
@@ -175,7 +171,6 @@
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
 
-        // Логика советов (переписана надёжно)
         const tipsData = {
             'chest_press': ["💡 Дыхание: Вдох при опускании, выдох при жиме вверх.", "💡 Лопатки: Сведи лопатки и прижми к скамье.", "💡 Темп: Опускай за 2 сек, выжимай за 1 сек."],
             'butterfly': ["💡 Дыхание: Выдох при сведении, вдох при возвращении.", "💡 Локти: Держи локти слегка согнутыми (15°).", "💡 Темп: Своди за 1 сек, разводи за 2 сек."],
@@ -196,21 +191,16 @@
             const tips = tipsData[exercise];
             if (tips) {
                 let html = `<h4>💡 Советы от профессионалов</h4><ul>`;
-                tips.forEach(tip => {
-                    html += `<li>${tip}</li>`;
-                });
+                tips.forEach(tip => { html += `<li>${tip}</li>`; });
                 html += `</ul>`;
                 tipsContainer.innerHTML = html;
             } else {
                 tipsContainer.innerHTML = "";
             }
         }
-
-        // Вызовем при загрузке и при смене
         displayTips();
         exerciseSelect.addEventListener('change', displayTips);
 
-        // Логика видео и анализа
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -226,7 +216,8 @@
         let minAngle = 180;
         let repCount = 0;
         let qualityReps = 0;
-        let lastPhase = null;
+        let lastPhase = 0; // 0 = нейтрально, 1 = сокращение, 2 = растяжение
+        let repCooldown = 0; // Задержка после подсчета повторения
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -248,7 +239,7 @@
             report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
 
             if (exerciseSelect.value === 'lat_pulldown' || exerciseSelect.value === 'seated_row') {
-                if (maxAngle >= 160) {
+                if (maxAngle >= 165) {
                     report += "✅ Полное растяжение (угол ~" + Math.round(maxAngle) + "°).\n";
                     score += 40;
                 } else if (maxAngle >= 140) {
@@ -258,7 +249,7 @@
                     report += "❌ Недостаточное растяжение.\n";
                     score += 5;
                 }
-                if (minAngle <= 90) {
+                if (minAngle <= 95) {
                     report += "✅ Полное сокращение (угол ~" + Math.round(minAngle) + "°).\n";
                     score += 40;
                 } else if (minAngle <= 110) {
@@ -269,7 +260,7 @@
                     score += 5;
                 }
             } else {
-                if (minAngle <= 90 && maxAngle >= 160) {
+                if (minAngle <= 95 && maxAngle >= 165) {
                     report += "✅ Отличная амплитуда!\n";
                     score = 80;
                 } else {
@@ -294,7 +285,8 @@
                 minAngle = 180;
                 repCount = 0;
                 qualityReps = 0;
-                lastPhase = null;
+                lastPhase = 0;
+                repCooldown = 0;
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -378,23 +370,24 @@
                         if (angle > maxAngle) maxAngle = angle;
                         if (angle < minAngle) minAngle = angle;
 
-                        // Логика подсчета повторений
-                        if (exerciseSelect.value === 'lat_pulldown' || exerciseSelect.value === 'seated_row' || exerciseSelect.value === 'bicep_curl') {
-                            if (angle < 90 && lastPhase !== 'contracted') {
-                                repCount++;
-                                if (minAngle <= 90) qualityReps++;
-                                lastPhase = 'contracted';
-                            } else if (angle > 160 && lastPhase !== 'extended') {
-                                lastPhase = 'extended';
-                            }
-                        } else {
-                            if (angle > 160 && lastPhase !== 'extended') {
-                                repCount++;
-                                if (maxAngle >= 160) qualityReps++;
-                                lastPhase = 'extended';
-                            } else if (angle < 90 && lastPhase !== 'contracted') {
-                                lastPhase = 'contracted';
-                            }
+                        // Уменьшаем кулдаун
+                        if (repCooldown > 0) repCooldown--;
+
+                        // Улучшенный подсчет повторений с защитой от дребезга
+                        // 1. Определяем фазу сокращения (угол < 95)
+                        if (angle < 95 && lastPhase !== 1) {
+                            lastPhase = 1; // Вошли в сокращение
+                        }
+                        // 2. Если мы были в сокращении и вернулись в полное растяжение (угол > 165), считаем повторение
+                        else if (angle > 165 && lastPhase === 1 && repCooldown === 0) {
+                            repCount++;
+                            qualityReps++;
+                            lastPhase = 2; // Вошли в растяжение
+                            repCooldown = 15; // Блокируем счет на 15 кадров (следующие 150 обработанных миллисекунд)
+                        }
+                        // 3. Если мы были в растяжении и снова вошли в сокращение, сбрасываем фазу для следующего цикла
+                        else if (angle < 95 && lastPhase === 2) {
+                            lastPhase = 1;
                         }
                     }
                 }
