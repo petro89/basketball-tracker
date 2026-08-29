@@ -210,10 +210,8 @@
         const playPauseTechBtn = document.getElementById('playPauseTech');
 
         let net = null;
+        let techFrames = 0;
         let repCount = 0;
-        let armState = 'neutral';
-        let smoothing = [];
-        let framesSinceRep = 0;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -236,9 +234,10 @@
 
         function resetCounters() {
             repCount = 0;
-            armState = 'neutral';
-            smoothing = [];
-            framesSinceRep = 0;
+            lowSeen = false;
+            highSeen = false;
+            lowCounter = 0;
+            highCounter = 0;
         }
 
         uploadTechBtn.onclick = () => techUploadInput.click();
@@ -312,71 +311,71 @@
             }
         }
 
-        // ГИБРИДНАЯ ЛОГИКА: Используем ОБЕ руки и сглаживание
+        // НОВАЯ ЛОГИКА: С подтверждением фазы через несколько кадров
+        let lowSeen = false;
+        let highSeen = false;
+        let lowCounter = 0;
+        let highCounter = 0;
+        const LOW_THRESHOLD = 100;
+        const HIGH_THRESHOLD = 160;
+        const STABILITY_FRAMES = 5;
+
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
-            // Обрабатываем каждый 5-й кадр для более частого сэмплирования
-            if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            if (techFrames % 3 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
                 drawSkeleton(pose.keypoints);
 
-                // Получаем углы для обеих рук
                 const lShoulder = pose.keypoints[5];
                 const lElbow = pose.keypoints[7];
                 const lWrist = pose.keypoints[9];
-                const rShoulder = pose.keypoints[6];
-                const rElbow = pose.keypoints[8];
-                const rWrist = pose.keypoints[10];
 
-                // Используем ту руку, которая имеет лучший score
-                let angles = [];
                 if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
-                    angles.push({ angle: calculateAngle(lShoulder, lElbow, lWrist), score: lShoulder.score });
-                }
-                if (rShoulder && rElbow && rWrist && rShoulder.position && rElbow.position && rWrist.position) {
-                    angles.push({ angle: calculateAngle(rShoulder, rElbow, rWrist), score: rShoulder.score });
-                }
-
-                if (angles.length > 0) {
-                    // Берем лучший угол (с максимальным score)
-                    let bestAngle = angles[0];
-                    for (let i = 1; i < angles.length; i++) {
-                        if (angles[i].score > bestAngle.score) bestAngle = angles[i];
-                    }
-
-                    const rawAngle = bestAngle.angle;
-                    if (rawAngle !== null) {
-                        // Сглаживание (5 кадров)
-                        smoothing.push(rawAngle);
-                        if (smoothing.length > 5) smoothing.shift();
-                        const avgAngle = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
-
-                        if (framesSinceRep > 0) framesSinceRep--;
-
-                        // Логика с порогами 90 и 135
-                        if (avgAngle < 90) {
-                            armState = 'down'; // Руки внизу (сокращение)
-                        } else if (avgAngle > 135) {
-                            armState = 'up'; // Руки вверху (растяжение)
+                    const angle = calculateAngle(lShoulder, lElbow, lWrist);
+                    if (angle !== null) {
+                        if (angle < LOW_THRESHOLD) {
+                            lowCounter++;
+                            if (lowCounter >= STABILITY_FRAMES) {
+                                lowSeen = true;
+                                highCounter = 0;
+                            }
+                        } else {
+                            lowCounter = 0;
                         }
 
-                        // Подсчет повторений: переход из 'down' в 'up'
-                        if (armState === 'up' && prevState === 'down' && framesSinceRep === 0) {
+                        if (angle > HIGH_THRESHOLD) {
+                            highCounter++;
+                            if (highCounter >= STABILITY_FRAMES) {
+                                highSeen = true;
+                                lowCounter = 0;
+                            }
+                        } else {
+                            highCounter = 0;
+                        }
+
+                        if (lowSeen && highSeen) {
                             repCount++;
-                            framesSinceRep = 10; // 10 кадров задержки
+                            lowSeen = false;
+                            highSeen = false;
+                            lowCounter = 0;
+                            highCounter = 0;
                         }
-
-                        // Запоминаем предыдущее состояние
-                        prevState = armState;
                     }
                 }
             }
             requestAnimationFrame(detectTechnique);
         }
-        let prevState = 'neutral';
+
+        function calculateAngle(a, b, c) {
+            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
+            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
+        }
     </script>
 </body>
 </html>
