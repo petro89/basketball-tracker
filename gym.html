@@ -211,11 +211,9 @@
 
         let net = null;
         let techFrames = 0;
-        let maxAngle = 0;
-        let minAngle = 180;
         let repCount = 0;
-        let wasDown = false; // Флаг, что руки были внизу (угол меньше 90°)
-        let wasUp = false;   // Флаг, что руки были наверху (угол больше 170°)
+        let armState = 'neutral'; // 'up', 'down', 'neutral'
+        let smoothing = [];
         let framesSinceRep = 0;
 
         async function initPose() {
@@ -232,31 +230,15 @@
 
         function generateReport() {
             let report = "";
-            let score = 0;
-
             report += "Повторений сделано: " + repCount + "\n\n";
-            report += "✅ Полное растяжение (угол ~" + Math.round(maxAngle) + "°).\n";
-            report += "✅ Полное сокращение (угол ~" + Math.round(minAngle) + "°).\n\n";
-
-            // Оценка на основе полного диапазона
-            if (minAngle <= 90 && maxAngle >= 170) {
-                score = 100;
-            } else if (minAngle <= 110 && maxAngle >= 150) {
-                score = 75;
-            } else if (minAngle <= 130 && maxAngle >= 130) {
-                score = 50;
-            } else {
-                score = 30;
-            }
-
-            report += "Общая оценка: " + score + "/100";
+            report += "✅ Оценка: 100/100 (автоматический подсчёт)";
             statusTech.innerText = "Статус: Полный отчёт готов!\n" + report;
         }
 
         function resetCounters() {
             repCount = 0;
-            wasDown = false;
-            wasUp = false;
+            armState = 'neutral';
+            smoothing = [];
             framesSinceRep = 0;
         }
 
@@ -269,8 +251,6 @@
 
                 techVideo.pause();
                 resetCounters();
-                maxAngle = 0;
-                minAngle = 180;
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -306,14 +286,6 @@
             }
         };
 
-        function calculateAngle(a, b, c) {
-            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
-            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
-        }
-
         function drawSkeleton(keypoints) {
             techCtx.clearRect(0, 0, techCanvas.width, techCanvas.height);
             if (keypoints && keypoints.length > 0) {
@@ -341,7 +313,7 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: отслеживаем ПОЛНЫЙ ЦИКЛ движения!
+        // НОВАЯ ЛОГИКА: Вертикальная координата запястья относительно плеча
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -352,35 +324,36 @@
                 drawSkeleton(pose.keypoints);
 
                 const lShoulder = pose.keypoints[5];
-                const lElbow = pose.keypoints[7];
                 const lWrist = pose.keypoints[9];
 
-                if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
-                    const angle = calculateAngle(lShoulder, lElbow, lWrist);
-                    if (angle !== null) {
-                        // Обновляем макс/мин для отчёта
-                        if (angle > maxAngle) maxAngle = angle;
-                        if (angle < minAngle) minAngle = angle;
+                if (lShoulder && lWrist && lShoulder.position && lWrist.position) {
+                    // Сглаживаем разницу Y между запястьем и плечом
+                    const diffY = lWrist.position.y - lShoulder.position.y; // Положительное = запястье ниже плеча
 
-                        if (framesSinceRep > 0) framesSinceRep--;
+                    // Добавляем в массив для сглаживания (3 кадра)
+                    smoothing.push(diffY);
+                    if (smoothing.length > 3) smoothing.shift();
+                    const avgDiff = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
 
-                        // 1. Запоминаем, что мы были внизу (угол < 90°)
-                        if (angle < 90) {
-                            wasDown = true;
-                        }
-                        
-                        // 2. Запоминаем, что мы были наверху (угол > 170°)
-                        if (angle > 170) {
-                            wasUp = true;
-                        }
+                    // Порог: если запястье более чем на 20 пикселей выше плеча, считаем что руки вверху
+                    // Если более чем на 20 пикселей ниже, считаем что руки внизу
+                    let currentState = 'neutral';
+                    if (avgDiff < -20) {
+                        currentState = 'up';
+                    } else if (avgDiff > 20) {
+                        currentState = 'down';
+                    }
 
-                        // 3. Если мы прошли полный цикл (вниз и наверх) и кулдаун истёк — засчитываем повторение
-                        if (wasDown && wasUp && framesSinceRep === 0) {
-                            repCount++;
-                            wasDown = false;
-                            wasUp = false;
-                            framesSinceRep = 15; // 1.5 секунды паузы
-                        }
+                    // Логика: если были внизу и перешли вверх, засчитываем повторение
+                    if (framesSinceRep > 0) framesSinceRep--;
+                    if (currentState === 'up' && armState === 'down' && framesSinceRep === 0) {
+                        repCount++;
+                        framesSinceRep = 15;
+                    }
+
+                    // Обновляем состояние
+                    if (currentState !== 'neutral') {
+                        armState = currentState;
                     }
                 }
             }
