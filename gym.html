@@ -17,7 +17,8 @@
         .nav-link { display: block; background: linear-gradient(135deg, #ff9500, #ff5e00); color: white; text-decoration: none; padding: 12px; border-radius: 18px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4); }
         
         .video-container { width: 100%; height: 280px; border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 10px; position: relative; border: 2px solid rgba(255, 255, 255, 0.1); }
-        video, canvas { width: 100%; height: 100%; object-fit: cover; }
+        /* ИСПРАВЛЕНИЕ: contain вместо cover, чтобы видео не обрезалось */
+        video, canvas { width: 100%; height: 100%; object-fit: contain; }
         canvas { position: absolute; top: 0; left: 0; z-index: 10; }
         .pause-btn { background: linear-gradient(135deg, #555, #333); border-radius: 10px; padding: 10px 15px; font-size: 14px; width: 100%; margin-bottom: 15px; }
         .custom-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 5px; outline: none; margin: 0 0 20px 0; cursor: pointer; }
@@ -216,7 +217,7 @@
         let minAngle = 180;
         let repCount = 0;
         let qualityReps = 0;
-        let lastPhase = 0; // 0 = нейтрально, 1 = сокращение
+        let lastPhase = 0;
         let repCooldown = 0;
 
         async function initPose() {
@@ -372,26 +373,19 @@
 
                         if (repCooldown > 0) repCooldown--;
 
-                        // Логика подсчета повторений с обнаружением некачественных
-                        // 1. Начало сокращения: угол < 120 (смягчаем порог, чтобы считать неполные)
                         if (angle < 120 && lastPhase !== 1) {
                             lastPhase = 1;
                         }
-                        // 2. Возврат из сокращения: угол > 140
                         else if (lastPhase === 1 && angle > 140 && repCooldown === 0) {
                             repCount++;
-                            
-                            // Проверяем качество повторения
                             if (minAngle <= 95 && maxAngle >= 165) {
                                 qualityReps++;
                             }
-                            
-                            lastPhase = 0; // Сброс фазы
-                            maxAngle = 0; // Сброс макс угла
-                            minAngle = 180; // Сброс мин угла
-                            repCooldown = 15; // Защита от дребезга
+                            lastPhase = 0;
+                            maxAngle = 0;
+                            minAngle = 180;
+                            repCooldown = 15;
                         }
-                        // 3. Если мы начали сокращение (lastPhase == 1), но вернулись, не дойдя до 140, фаза может сброситься только при новом сокращении
                     }
                 }
             }
