@@ -216,8 +216,9 @@
         let minAngle = 180;
         let repCount = 0;
         let qualityReps = 0;
-        let prevAngle = 0; // Предыдущий угол для сглаживания
-        let isDown = false; // Флаг, что руки внизу (сокращение)
+        let isDown = false;
+        let minAngleCurrent = 180;
+        let maxAngleCurrent = 0;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -285,8 +286,9 @@
                 minAngle = 180;
                 repCount = 0;
                 qualityReps = 0;
-                prevAngle = 0;
                 isDown = false;
+                minAngleCurrent = 180;
+                maxAngleCurrent = 0;
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -351,7 +353,6 @@
             }
         }
 
-        // ОСНОВНАЯ ЛОГИКА ПОДСЧЁТА ПОВТОРЕНИЙ (по циклу изменения угла)
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -368,19 +369,26 @@
                 if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
                     const angle = calculateAngle(lShoulder, lElbow, lWrist);
                     if (angle !== null) {
-                        // Обновляем макс/мин углы
                         if (angle > maxAngle) maxAngle = angle;
                         if (angle < minAngle) minAngle = angle;
 
-                        // Логика цикла: когда угол падает ниже 100, считаем что руки внизу (сокращение)
-                        if (angle < 100) {
+                        if (angle > maxAngleCurrent) maxAngleCurrent = angle;
+                        if (angle < minAngleCurrent) minAngleCurrent = angle;
+
+                        // Засчитываем повторение при прохождении средних порогов
+                        if (angle < 120) {
                             isDown = true;
                         }
-                        // Когда угол поднимается выше 160 после того как был внизу, засчитываем повторение
-                        if (angle > 160 && isDown) {
+                        if (angle > 140 && isDown) {
                             repCount++;
-                            qualityReps++;
+                            // Проверяем качество: были ли достигнуты идеальные углы
+                            if (minAngleCurrent <= 100 && maxAngleCurrent >= 160) {
+                                qualityReps++;
+                            }
+                            // Сбрасываем текущие углы
                             isDown = false;
+                            minAngleCurrent = 180;
+                            maxAngleCurrent = 0;
                         }
                     }
                 }
