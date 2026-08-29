@@ -217,16 +217,17 @@
         let framesSinceRep = 0;
         let smoothing = [];
 
-        const LOW_THRESHOLD = 110;   // Было 120
-        const HIGH_THRESHOLD = 135;  // Было 140
+        const LOW_THRESHOLD = 110;
+        const HIGH_THRESHOLD = 135;
         const QUALITY_LOW = 105;
         const QUALITY_HIGH = 145;
 
+        // УЛУЧШЕННАЯ ТОЧНОСТЬ: Большее разрешение и multiplier
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 192, multiplier: 0.75 });
+                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 1.0 });
                 statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -330,7 +331,6 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: каждые 2 кадра + сглаживание
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -369,14 +369,12 @@
 
                     if (framesSinceRep > 0) framesSinceRep--;
 
-                    // Смягченные пороги: вниз при 110, вверх при 135
                     if (smoothedAngle < LOW_THRESHOLD) {
                         isDown = true;
                     }
                     if (smoothedAngle > HIGH_THRESHOLD && isDown && framesSinceRep === 0) {
                         repCount++;
                         
-                        // Проверка качества: если в этом повторе был угол хотя бы 105 и 145
                         if (smoothing.some(a => a < QUALITY_LOW) && smoothing.some(a => a > QUALITY_HIGH)) {
                             qualityReps++;
                         }
