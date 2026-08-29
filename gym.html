@@ -217,8 +217,8 @@
         let repCount = 0;
         let qualityReps = 0;
         let isDown = false;
-        let minAngleCurrent = 180;
-        let maxAngleCurrent = 0;
+        let prevAngles = []; // Для сглаживания
+        let framesSinceRep = 0; // Защита от дребезга
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -274,6 +274,14 @@
             statusTech.innerText = "Статус: Полный отчёт готов!\n" + report;
         }
 
+        function resetCounters() {
+            repCount = 0;
+            qualityReps = 0;
+            isDown = false;
+            prevAngles = [];
+            framesSinceRep = 0;
+        }
+
         uploadTechBtn.onclick = () => techUploadInput.click();
         techUploadInput.onchange = async function(e) {
             const file = e.target.files[0];
@@ -282,13 +290,7 @@
                 if (!net) { await initPose(); }
 
                 techVideo.pause();
-                maxAngle = 0;
-                minAngle = 180;
-                repCount = 0;
-                qualityReps = 0;
-                isDown = false;
-                minAngleCurrent = 180;
-                maxAngleCurrent = 0;
+                resetCounters();
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -310,6 +312,13 @@
                 techVideo.onended = () => {
                     generateReport();
                 };
+
+                // Сбрасываем счётчик при перемотке на начало
+                techVideo.addEventListener('timeupdate', () => {
+                    if (techVideo.currentTime < 0.5) {
+                        resetCounters();
+                    }
+                });
 
                 seekTech.max = 100; seekTech.value = 0;
                 techVideo.addEventListener('timeupdate', () => { const progress = (techVideo.currentTime / techVideo.duration) * 100; seekTech.value = progress; seekTech.style.setProperty('--progress', progress + '%'); });
@@ -369,26 +378,29 @@
                 if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
                     const angle = calculateAngle(lShoulder, lElbow, lWrist);
                     if (angle !== null) {
-                        if (angle > maxAngle) maxAngle = angle;
-                        if (angle < minAngle) minAngle = angle;
+                        // Сглаживание: добавляем текущий угол в массив, храним последние 5
+                        prevAngles.push(angle);
+                        if (prevAngles.length > 5) prevAngles.shift();
+                        const smoothedAngle = prevAngles.reduce((a, b) => a + b, 0) / prevAngles.length;
 
-                        if (angle > maxAngleCurrent) maxAngleCurrent = angle;
-                        if (angle < minAngleCurrent) minAngleCurrent = angle;
+                        // Обновляем глобальные максимумы/минимумы для отчёта
+                        if (smoothedAngle > maxAngle) maxAngle = smoothedAngle;
+                        if (smoothedAngle < minAngle) minAngle = smoothedAngle;
 
-                        // Засчитываем повторение при прохождении средних порогов
-                        if (angle < 120) {
+                        // Логика с порогами и защитой от дребезга
+                        if (framesSinceRep > 0) framesSinceRep--;
+
+                        // Руки внизу (сокращение): угол меньше 100
+                        if (smoothedAngle < 100) {
                             isDown = true;
                         }
-                        if (angle > 140 && isDown) {
+                        // Руки вверху (растяжение): угол больше 160, и только если перед этим были внизу
+                        if (smoothedAngle > 160 && isDown && framesSinceRep === 0) {
                             repCount++;
-                            // Проверяем качество: были ли достигнуты идеальные углы
-                            if (minAngleCurrent <= 100 && maxAngleCurrent >= 160) {
-                                qualityReps++;
-                            }
-                            // Сбрасываем текущие углы
+                            // Качество проверяем по глобальным минимумам/максимумам (примерно)
+                            qualityReps++; // В этой версии все повторения, прошедшие пороги, считаем качественными
                             isDown = false;
-                            minAngleCurrent = 180;
-                            maxAngleCurrent = 0;
+                            framesSinceRep = 10; // Не считаем повторения в течение следующих 10 кадров
                         }
                     }
                 }
