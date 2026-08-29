@@ -213,19 +213,14 @@
         let techFrames = 0;
         let repCount = 0;
         let qualityReps = 0;
-        let maxAngle = 0;
-        let minAngle = 180;
         let isDown = false;
         let framesSinceRep = 0;
+        let smoothing = [];
 
-        // Переменные для качества каждого повторения
-        let currentRepMax = 0;
-        let currentRepMin = 180;
-
-        const LOW_THRESHOLD = 120;
-        const HIGH_THRESHOLD = 140;
-        const QUALITY_LOW = 110;
-        const QUALITY_HIGH = 150;
+        const LOW_THRESHOLD = 110;   // Было 120
+        const HIGH_THRESHOLD = 135;  // Было 140
+        const QUALITY_LOW = 105;
+        const QUALITY_HIGH = 145;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -246,12 +241,10 @@
             report += "Повторений сделано: " + repCount + "\n";
             report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
             
-            if (minAngle <= QUALITY_LOW && maxAngle >= QUALITY_HIGH) {
+            if (qualityReps > 0) {
                 score = 100;
-            } else if (minAngle <= LOW_THRESHOLD && maxAngle >= HIGH_THRESHOLD) {
-                score = 75;
             } else {
-                score = 50;
+                score = 70;
             }
 
             report += "Общая оценка: " + score + "/100";
@@ -261,12 +254,9 @@
         function resetCounters() {
             repCount = 0;
             qualityReps = 0;
-            maxAngle = 0;
-            minAngle = 180;
-            currentRepMax = 0;
-            currentRepMin = 180;
             isDown = false;
             framesSinceRep = 0;
+            smoothing = [];
         }
 
         uploadTechBtn.onclick = () => techUploadInput.click();
@@ -340,11 +330,11 @@
             }
         }
 
-        // ЛОГИКА С КАЧЕСТВЕННЫМИ ПОВТОРЕНИЯМИ
+        // НОВАЯ ЛОГИКА: каждые 2 кадра + сглаживание
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
-            if (techFrames % 3 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            if (techFrames % 2 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
@@ -372,30 +362,28 @@
                 }
 
                 if (bestAngle !== null) {
-                    if (bestAngle > maxAngle) maxAngle = bestAngle;
-                    if (bestAngle < minAngle) minAngle = bestAngle;
-
-                    // Следим за качеством текущего повтора
-                    if (bestAngle > currentRepMax) currentRepMax = bestAngle;
-                    if (bestAngle < currentRepMin) currentRepMin = bestAngle;
+                    // Сглаживание (5 последних значений)
+                    smoothing.push(bestAngle);
+                    if (smoothing.length > 5) smoothing.shift();
+                    const smoothedAngle = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
 
                     if (framesSinceRep > 0) framesSinceRep--;
 
-                    if (bestAngle < LOW_THRESHOLD) {
+                    // Смягченные пороги: вниз при 110, вверх при 135
+                    if (smoothedAngle < LOW_THRESHOLD) {
                         isDown = true;
                     }
-                    if (bestAngle > HIGH_THRESHOLD && isDown && framesSinceRep === 0) {
+                    if (smoothedAngle > HIGH_THRESHOLD && isDown && framesSinceRep === 0) {
                         repCount++;
-
-                        // Проверяем, было ли это качественное повторение
-                        if (currentRepMin <= QUALITY_LOW && currentRepMax >= QUALITY_HIGH) {
+                        
+                        // Проверка качества: если в этом повторе был угол хотя бы 105 и 145
+                        if (smoothing.some(a => a < QUALITY_LOW) && smoothing.some(a => a > QUALITY_HIGH)) {
                             qualityReps++;
                         }
-
+                        
                         isDown = false;
                         framesSinceRep = 10;
-                        currentRepMax = 0;
-                        currentRepMin = 180;
+                        smoothing = [];
                     }
                 }
             }
