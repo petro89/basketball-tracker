@@ -210,9 +210,8 @@
         const playPauseTechBtn = document.getElementById('playPauseTech');
 
         let net = null;
-        let techFrames = 0;
         let repCount = 0;
-        let armState = 'neutral'; // 'up', 'down', 'neutral'
+        let armState = 'neutral';
         let smoothing = [];
         let framesSinceRep = 0;
 
@@ -313,52 +312,71 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: Вертикальная координата запястья относительно плеча
+        // ГИБРИДНАЯ ЛОГИКА: Используем ОБЕ руки и сглаживание
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
-            if (techFrames % 10 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            // Обрабатываем каждый 5-й кадр для более частого сэмплирования
+            if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
                 drawSkeleton(pose.keypoints);
 
+                // Получаем углы для обеих рук
                 const lShoulder = pose.keypoints[5];
+                const lElbow = pose.keypoints[7];
                 const lWrist = pose.keypoints[9];
+                const rShoulder = pose.keypoints[6];
+                const rElbow = pose.keypoints[8];
+                const rWrist = pose.keypoints[10];
 
-                if (lShoulder && lWrist && lShoulder.position && lWrist.position) {
-                    // Сглаживаем разницу Y между запястьем и плечом
-                    const diffY = lWrist.position.y - lShoulder.position.y; // Положительное = запястье ниже плеча
+                // Используем ту руку, которая имеет лучший score
+                let angles = [];
+                if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
+                    angles.push({ angle: calculateAngle(lShoulder, lElbow, lWrist), score: lShoulder.score });
+                }
+                if (rShoulder && rElbow && rWrist && rShoulder.position && rElbow.position && rWrist.position) {
+                    angles.push({ angle: calculateAngle(rShoulder, rElbow, rWrist), score: rShoulder.score });
+                }
 
-                    // Добавляем в массив для сглаживания (3 кадра)
-                    smoothing.push(diffY);
-                    if (smoothing.length > 3) smoothing.shift();
-                    const avgDiff = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
-
-                    // Порог: если запястье более чем на 20 пикселей выше плеча, считаем что руки вверху
-                    // Если более чем на 20 пикселей ниже, считаем что руки внизу
-                    let currentState = 'neutral';
-                    if (avgDiff < -20) {
-                        currentState = 'up';
-                    } else if (avgDiff > 20) {
-                        currentState = 'down';
+                if (angles.length > 0) {
+                    // Берем лучший угол (с максимальным score)
+                    let bestAngle = angles[0];
+                    for (let i = 1; i < angles.length; i++) {
+                        if (angles[i].score > bestAngle.score) bestAngle = angles[i];
                     }
 
-                    // Логика: если были внизу и перешли вверх, засчитываем повторение
-                    if (framesSinceRep > 0) framesSinceRep--;
-                    if (currentState === 'up' && armState === 'down' && framesSinceRep === 0) {
-                        repCount++;
-                        framesSinceRep = 15;
-                    }
+                    const rawAngle = bestAngle.angle;
+                    if (rawAngle !== null) {
+                        // Сглаживание (5 кадров)
+                        smoothing.push(rawAngle);
+                        if (smoothing.length > 5) smoothing.shift();
+                        const avgAngle = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
 
-                    // Обновляем состояние
-                    if (currentState !== 'neutral') {
-                        armState = currentState;
+                        if (framesSinceRep > 0) framesSinceRep--;
+
+                        // Логика с порогами 90 и 135
+                        if (avgAngle < 90) {
+                            armState = 'down'; // Руки внизу (сокращение)
+                        } else if (avgAngle > 135) {
+                            armState = 'up'; // Руки вверху (растяжение)
+                        }
+
+                        // Подсчет повторений: переход из 'down' в 'up'
+                        if (armState === 'up' && prevState === 'down' && framesSinceRep === 0) {
+                            repCount++;
+                            framesSinceRep = 10; // 10 кадров задержки
+                        }
+
+                        // Запоминаем предыдущее состояние
+                        prevState = armState;
                     }
                 }
             }
             requestAnimationFrame(detectTechnique);
         }
+        let prevState = 'neutral';
     </script>
 </body>
 </html>
