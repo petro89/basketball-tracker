@@ -17,7 +17,6 @@
         .nav-link { display: block; background: linear-gradient(135deg, #ff9500, #ff5e00); color: white; text-decoration: none; padding: 12px; border-radius: 18px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4); }
         
         .video-container { width: 100%; height: 280px; border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 10px; position: relative; border: 2px solid rgba(255, 255, 255, 0.1); }
-        /* ИСПРАВЛЕНИЕ: contain вместо cover, чтобы видео не обрезалось */
         video, canvas { width: 100%; height: 100%; object-fit: contain; }
         canvas { position: absolute; top: 0; left: 0; z-index: 10; }
         .pause-btn { background: linear-gradient(135deg, #555, #333); border-radius: 10px; padding: 10px 15px; font-size: 14px; width: 100%; margin-bottom: 15px; }
@@ -217,8 +216,7 @@
         let minAngle = 180;
         let repCount = 0;
         let qualityReps = 0;
-        let lastPhase = 0;
-        let repCooldown = 0;
+        let lastPhase = ''; // '', 'extended', 'contracted'
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -240,32 +238,34 @@
             report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
 
             if (exerciseSelect.value === 'lat_pulldown' || exerciseSelect.value === 'seated_row') {
-                if (maxAngle >= 165) {
-                    report += "✅ Полное растяжение (угол ~" + Math.round(maxAngle) + "°).\n";
+                // Растяжение (руки наверху)
+                if (maxAngle >= 160) {
+                    report += "✅ Полное растяжение (руки вытянуты вверх).\n";
                     score += 40;
                 } else if (maxAngle >= 140) {
                     report += "🟡 Почти полное растяжение.\n";
                     score += 20;
                 } else {
-                    report += "❌ Недостаточное растяжение.\n";
+                    report += "❌ Недостаточное растяжение (руки не подняты достаточно высоко).\n";
                     score += 5;
                 }
-                if (minAngle <= 95) {
-                    report += "✅ Полное сокращение (угол ~" + Math.round(minAngle) + "°).\n";
+                // Сокращение (руки внизу)
+                if (minAngle <= 100) {
+                    report += "✅ Полное сокращение (руки согнуты, локти опущены).\n";
                     score += 40;
-                } else if (minAngle <= 110) {
+                } else if (minAngle <= 120) {
                     report += "🟡 Почти полное сокращение.\n";
                     score += 20;
                 } else {
-                    report += "❌ Недостаточное сокращение.\n";
+                    report += "❌ Недостаточное сокращение (руки не опущены достаточно глубоко).\n";
                     score += 5;
                 }
             } else {
-                if (minAngle <= 95 && maxAngle >= 165) {
+                if (minAngle <= 100 && maxAngle >= 160) {
                     report += "✅ Отличная амплитуда!\n";
                     score = 80;
                 } else {
-                    report += "🟡 Средняя амплитуда.\n";
+                    report += "🟡 Средняя амплитуда. Попробуй добавить полный диапазон!\n";
                     score = 50;
                 }
             }
@@ -286,8 +286,7 @@
                 minAngle = 180;
                 repCount = 0;
                 qualityReps = 0;
-                lastPhase = 0;
-                repCooldown = 0;
+                lastPhase = '';
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -352,6 +351,7 @@
             }
         }
 
+        // ОСНОВНАЯ ЛОГИКА ПОДСЧЁТА ПОВТОРЕНИЙ (ИСПРАВЛЕННАЯ)
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -365,27 +365,32 @@
                 const lElbow = pose.keypoints[7];
                 const lWrist = pose.keypoints[9];
 
-                if (lShoulder && lElbow && lWrist) {
+                if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
+                    // 1. Считаем угол для отчёта
                     const angle = calculateAngle(lShoulder, lElbow, lWrist);
                     if (angle !== null) {
                         if (angle > maxAngle) maxAngle = angle;
                         if (angle < minAngle) minAngle = angle;
+                    }
 
-                        if (repCooldown > 0) repCooldown--;
+                    // 2. Определяем фазу по ВЕРТИКАЛЬНОМУ ПОЛОЖЕНИЮ запястья относительно локтя
+                    // Это самый надёжный метод для вертикальных упражнений!
+                    let currentPhase = '';
+                    if (lWrist.position.y < lElbow.position.y) {
+                        currentPhase = 'extended'; // Запястье выше локтя => руки наверху (растяжение)
+                    } else {
+                        currentPhase = 'contracted'; // Запястье ниже локтя => руки внизу (сокращение)
+                    }
 
-                        if (angle < 120 && lastPhase !== 1) {
-                            lastPhase = 1;
-                        }
-                        else if (lastPhase === 1 && angle > 140 && repCooldown === 0) {
-                            repCount++;
-                            if (minAngle <= 95 && maxAngle >= 165) {
-                                qualityReps++;
-                            }
-                            lastPhase = 0;
-                            maxAngle = 0;
-                            minAngle = 180;
-                            repCooldown = 15;
-                        }
+                    // 3. Подсчёт повторений на основе смены фаз
+                    if (currentPhase === 'extended' && lastPhase === 'contracted') {
+                        repCount++;
+                        qualityReps++;
+                        lastPhase = 'extended';
+                    } else if (currentPhase === 'contracted' && lastPhase === 'extended') {
+                        lastPhase = 'contracted';
+                    } else if (currentPhase !== lastPhase) {
+                        lastPhase = currentPhase;
                     }
                 }
             }
