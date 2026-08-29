@@ -216,7 +216,8 @@
         let minAngle = 180;
         let repCount = 0;
         let qualityReps = 0;
-        let lastPhase = ''; // '', 'extended', 'contracted'
+        let prevAngle = 0; // Предыдущий угол для сглаживания
+        let isDown = false; // Флаг, что руки внизу (сокращение)
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -284,7 +285,8 @@
                 minAngle = 180;
                 repCount = 0;
                 qualityReps = 0;
-                lastPhase = '';
+                prevAngle = 0;
+                isDown = false;
 
                 const url = URL.createObjectURL(file);
                 techVideo.src = url;
@@ -349,7 +351,7 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА ПОДСЧЁТА ПОВТОРЕНИЙ (по высоте запястья относительно плеча)
+        // ОСНОВНАЯ ЛОГИКА ПОДСЧЁТА ПОВТОРЕНИЙ (по циклу изменения угла)
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -366,27 +368,20 @@
                 if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
                     const angle = calculateAngle(lShoulder, lElbow, lWrist);
                     if (angle !== null) {
+                        // Обновляем макс/мин углы
                         if (angle > maxAngle) maxAngle = angle;
                         if (angle < minAngle) minAngle = angle;
-                    }
 
-                    // Определяем фазу по вертикали: запястье относительно ПЛЕЧА
-                    let currentPhase = '';
-                    if (lWrist.position.y < lShoulder.position.y) {
-                        currentPhase = 'extended'; // Запястье выше плеча => руки вверху (растяжение)
-                    } else {
-                        currentPhase = 'contracted'; // Запястье ниже плеча => руки внизу (сокращение)
-                    }
-
-                    // Подсчёт повторений: переход из сокращения в растяжение
-                    if (currentPhase === 'extended' && lastPhase === 'contracted') {
-                        repCount++;
-                        qualityReps++;
-                        lastPhase = 'extended';
-                    } else if (currentPhase === 'contracted' && lastPhase === 'extended') {
-                        lastPhase = 'contracted';
-                    } else if (currentPhase !== lastPhase) {
-                        lastPhase = currentPhase;
+                        // Логика цикла: когда угол падает ниже 100, считаем что руки внизу (сокращение)
+                        if (angle < 100) {
+                            isDown = true;
+                        }
+                        // Когда угол поднимается выше 160 после того как был внизу, засчитываем повторение
+                        if (angle > 160 && isDown) {
+                            repCount++;
+                            qualityReps++;
+                            isDown = false;
+                        }
                     }
                 }
             }
