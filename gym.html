@@ -213,6 +213,12 @@
         let techFrames = 0;
         let repCount = 0;
 
+        // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ВЕРТИКАЛЬНОГО ОТСЛЕЖИВАНИЯ
+        let armState = 'neutral'; // 'down', 'up', 'neutral'
+        let prevArmState = 'neutral';
+        let wristY = [];
+        let framesSinceRep = 0;
+
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
@@ -234,10 +240,10 @@
 
         function resetCounters() {
             repCount = 0;
-            lowSeen = false;
-            highSeen = false;
-            lowCounter = 0;
-            highCounter = 0;
+            armState = 'neutral';
+            prevArmState = 'neutral';
+            wristY = [];
+            framesSinceRep = 0;
         }
 
         uploadTechBtn.onclick = () => techUploadInput.click();
@@ -311,70 +317,66 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: С подтверждением фазы через несколько кадров
-        let lowSeen = false;
-        let highSeen = false;
-        let lowCounter = 0;
-        let highCounter = 0;
-        const LOW_THRESHOLD = 100;
-        const HIGH_THRESHOLD = 160;
-        const STABILITY_FRAMES = 5;
-
+        // НОВАЯ ЛОГИКА: ВЕРТИКАЛЬНАЯ КООРДИНАТА ЗАПЯСТЬЯ
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
-            if (techFrames % 3 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
                 drawSkeleton(pose.keypoints);
 
                 const lShoulder = pose.keypoints[5];
-                const lElbow = pose.keypoints[7];
                 const lWrist = pose.keypoints[9];
+                const rShoulder = pose.keypoints[6];
+                const rWrist = pose.keypoints[10];
 
-                if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
-                    const angle = calculateAngle(lShoulder, lElbow, lWrist);
-                    if (angle !== null) {
-                        if (angle < LOW_THRESHOLD) {
-                            lowCounter++;
-                            if (lowCounter >= STABILITY_FRAMES) {
-                                lowSeen = true;
-                                highCounter = 0;
-                            }
-                        } else {
-                            lowCounter = 0;
-                        }
+                // Выбираем точку запястья с большим score (если видна левая, используем левую, иначе правую)
+                let wrist = null;
+                let shoulder = null;
 
-                        if (angle > HIGH_THRESHOLD) {
-                            highCounter++;
-                            if (highCounter >= STABILITY_FRAMES) {
-                                highSeen = true;
-                                lowCounter = 0;
-                            }
-                        } else {
-                            highCounter = 0;
-                        }
+                if (lShoulder && lWrist && lShoulder.score > 0.4 && lWrist.score > 0.4) {
+                    shoulder = lShoulder.position;
+                    wrist = lWrist.position;
+                } else if (rShoulder && rWrist && rShoulder.score > 0.4 && rWrist.score > 0.4) {
+                    shoulder = rShoulder.position;
+                    wrist = rWrist.position;
+                }
 
-                        if (lowSeen && highSeen) {
-                            repCount++;
-                            lowSeen = false;
-                            highSeen = false;
-                            lowCounter = 0;
-                            highCounter = 0;
-                        }
+                if (shoulder && wrist) {
+                    // Разница по Y (положительная = запястье ниже плеча)
+                    const diffY = wrist.y - shoulder.y;
+                    
+                    // Сглаживание (массив последних 5 значений)
+                    wristY.push(diffY);
+                    if (wristY.length > 5) wristY.shift();
+                    const avgDiff = wristY.reduce((a,b) => a+b, 0) / wristY.length;
+
+                    if (framesSinceRep > 0) framesSinceRep--;
+
+                    // Определяем состояние
+                    if (avgDiff < -20) {
+                        armState = 'up'; // Запястье выше плеча
+                    } else if (avgDiff > 20) {
+                        armState = 'down'; // Запястье ниже плеча
+                    } else {
+                        armState = 'neutral';
+                    }
+
+                    // Подсчет: если было внизу и стало наверху
+                    if (armState === 'up' && prevArmState === 'down' && framesSinceRep === 0) {
+                        repCount++;
+                        framesSinceRep = 10; // Подождать 10 кадров
+                    }
+
+                    // Обновляем предыдущее состояние
+                    if (armState !== 'neutral') {
+                        prevArmState = armState;
                     }
                 }
             }
             requestAnimationFrame(detectTechnique);
-        }
-
-        function calculateAngle(a, b, c) {
-            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
-            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
         }
     </script>
 </body>
