@@ -238,26 +238,24 @@
             report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
 
             if (exerciseSelect.value === 'lat_pulldown' || exerciseSelect.value === 'seated_row') {
-                // Растяжение (руки наверху)
                 if (maxAngle >= 160) {
-                    report += "✅ Полное растяжение (руки вытянуты вверх).\n";
+                    report += "✅ Полное растяжение (угол ~" + Math.round(maxAngle) + "°).\n";
                     score += 40;
                 } else if (maxAngle >= 140) {
                     report += "🟡 Почти полное растяжение.\n";
                     score += 20;
                 } else {
-                    report += "❌ Недостаточное растяжение (руки не подняты достаточно высоко).\n";
+                    report += "❌ Недостаточное растяжение.\n";
                     score += 5;
                 }
-                // Сокращение (руки внизу)
                 if (minAngle <= 100) {
-                    report += "✅ Полное сокращение (руки согнуты, локти опущены).\n";
+                    report += "✅ Полное сокращение (угол ~" + Math.round(minAngle) + "°).\n";
                     score += 40;
                 } else if (minAngle <= 120) {
                     report += "🟡 Почти полное сокращение.\n";
                     score += 20;
                 } else {
-                    report += "❌ Недостаточное сокращение (руки не опущены достаточно глубоко).\n";
+                    report += "❌ Недостаточное сокращение.\n";
                     score += 5;
                 }
             } else {
@@ -265,7 +263,7 @@
                     report += "✅ Отличная амплитуда!\n";
                     score = 80;
                 } else {
-                    report += "🟡 Средняя амплитуда. Попробуй добавить полный диапазон!\n";
+                    report += "🟡 Средняя амплитуда.\n";
                     score = 50;
                 }
             }
@@ -351,7 +349,7 @@
             }
         }
 
-        // ОСНОВНАЯ ЛОГИКА ПОДСЧЁТА ПОВТОРЕНИЙ (ИСПРАВЛЕННАЯ)
+        // НОВАЯ ЛОГИКА ПОДСЧЁТА ПОВТОРЕНИЙ (по высоте запястья относительно плеча)
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -366,23 +364,21 @@
                 const lWrist = pose.keypoints[9];
 
                 if (lShoulder && lElbow && lWrist && lShoulder.position && lElbow.position && lWrist.position) {
-                    // 1. Считаем угол для отчёта
                     const angle = calculateAngle(lShoulder, lElbow, lWrist);
                     if (angle !== null) {
                         if (angle > maxAngle) maxAngle = angle;
                         if (angle < minAngle) minAngle = angle;
                     }
 
-                    // 2. Определяем фазу по ВЕРТИКАЛЬНОМУ ПОЛОЖЕНИЮ запястья относительно локтя
-                    // Это самый надёжный метод для вертикальных упражнений!
+                    // Определяем фазу по вертикали: запястье относительно ПЛЕЧА
                     let currentPhase = '';
-                    if (lWrist.position.y < lElbow.position.y) {
-                        currentPhase = 'extended'; // Запястье выше локтя => руки наверху (растяжение)
+                    if (lWrist.position.y < lShoulder.position.y) {
+                        currentPhase = 'extended'; // Запястье выше плеча => руки вверху (растяжение)
                     } else {
-                        currentPhase = 'contracted'; // Запястье ниже локтя => руки внизу (сокращение)
+                        currentPhase = 'contracted'; // Запястье ниже плеча => руки внизу (сокращение)
                     }
 
-                    // 3. Подсчёт повторений на основе смены фаз
+                    // Подсчёт повторений: переход из сокращения в растяжение
                     if (currentPhase === 'extended' && lastPhase === 'contracted') {
                         repCount++;
                         qualityReps++;
