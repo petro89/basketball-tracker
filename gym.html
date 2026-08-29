@@ -212,12 +212,20 @@
         let net = null;
         let techFrames = 0;
         let repCount = 0;
-
-        // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ВЕРТИКАЛЬНОГО ОТСЛЕЖИВАНИЯ
-        let armState = 'neutral'; // 'down', 'up', 'neutral'
-        let prevArmState = 'neutral';
-        let wristY = [];
+        let qualityReps = 0;
+        let maxAngle = 0;
+        let minAngle = 180;
+        let isDown = false;
         let framesSinceRep = 0;
+
+        // Переменные для качества каждого повторения
+        let currentRepMax = 0;
+        let currentRepMin = 180;
+
+        const LOW_THRESHOLD = 120;
+        const HIGH_THRESHOLD = 140;
+        const QUALITY_LOW = 110;
+        const QUALITY_HIGH = 150;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
@@ -233,16 +241,31 @@
 
         function generateReport() {
             let report = "";
-            report += "Повторений сделано: " + repCount + "\n\n";
-            report += "✅ Оценка: 100/100 (автоматический подсчёт)";
+            let score = 0;
+
+            report += "Повторений сделано: " + repCount + "\n";
+            report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
+            
+            if (minAngle <= QUALITY_LOW && maxAngle >= QUALITY_HIGH) {
+                score = 100;
+            } else if (minAngle <= LOW_THRESHOLD && maxAngle >= HIGH_THRESHOLD) {
+                score = 75;
+            } else {
+                score = 50;
+            }
+
+            report += "Общая оценка: " + score + "/100";
             statusTech.innerText = "Статус: Полный отчёт готов!\n" + report;
         }
 
         function resetCounters() {
             repCount = 0;
-            armState = 'neutral';
-            prevArmState = 'neutral';
-            wristY = [];
+            qualityReps = 0;
+            maxAngle = 0;
+            minAngle = 180;
+            currentRepMax = 0;
+            currentRepMin = 180;
+            isDown = false;
             framesSinceRep = 0;
         }
 
@@ -317,66 +340,74 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: ВЕРТИКАЛЬНАЯ КООРДИНАТА ЗАПЯСТЬЯ
+        // ЛОГИКА С КАЧЕСТВЕННЫМИ ПОВТОРЕНИЯМИ
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
-            if (techFrames % 5 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            if (techFrames % 3 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
             const pose = await net.estimateSinglePose(techVideo);
             if (pose && pose.keypoints) {
                 drawSkeleton(pose.keypoints);
 
                 const lShoulder = pose.keypoints[5];
+                const lElbow = pose.keypoints[7];
                 const lWrist = pose.keypoints[9];
                 const rShoulder = pose.keypoints[6];
+                const rElbow = pose.keypoints[8];
                 const rWrist = pose.keypoints[10];
 
-                // Выбираем точку запястья с большим score (если видна левая, используем левую, иначе правую)
-                let wrist = null;
-                let shoulder = null;
-
-                if (lShoulder && lWrist && lShoulder.score > 0.4 && lWrist.score > 0.4) {
-                    shoulder = lShoulder.position;
-                    wrist = lWrist.position;
-                } else if (rShoulder && rWrist && rShoulder.score > 0.4 && rWrist.score > 0.4) {
-                    shoulder = rShoulder.position;
-                    wrist = rWrist.position;
+                let bestAngle = null;
+                if (lShoulder && lElbow && lWrist) {
+                    let a = calculateAngle(lShoulder, lElbow, lWrist);
+                    if (a !== null && (bestAngle === null || lShoulder.score > 0.5)) {
+                        bestAngle = a;
+                    }
+                }
+                if (rShoulder && rElbow && rWrist) {
+                    let a = calculateAngle(rShoulder, rElbow, rWrist);
+                    if (a !== null && (bestAngle === null || rShoulder.score > 0.5)) {
+                        bestAngle = a;
+                    }
                 }
 
-                if (shoulder && wrist) {
-                    // Разница по Y (положительная = запястье ниже плеча)
-                    const diffY = wrist.y - shoulder.y;
-                    
-                    // Сглаживание (массив последних 5 значений)
-                    wristY.push(diffY);
-                    if (wristY.length > 5) wristY.shift();
-                    const avgDiff = wristY.reduce((a,b) => a+b, 0) / wristY.length;
+                if (bestAngle !== null) {
+                    if (bestAngle > maxAngle) maxAngle = bestAngle;
+                    if (bestAngle < minAngle) minAngle = bestAngle;
+
+                    // Следим за качеством текущего повтора
+                    if (bestAngle > currentRepMax) currentRepMax = bestAngle;
+                    if (bestAngle < currentRepMin) currentRepMin = bestAngle;
 
                     if (framesSinceRep > 0) framesSinceRep--;
 
-                    // Определяем состояние
-                    if (avgDiff < -20) {
-                        armState = 'up'; // Запястье выше плеча
-                    } else if (avgDiff > 20) {
-                        armState = 'down'; // Запястье ниже плеча
-                    } else {
-                        armState = 'neutral';
+                    if (bestAngle < LOW_THRESHOLD) {
+                        isDown = true;
                     }
-
-                    // Подсчет: если было внизу и стало наверху
-                    if (armState === 'up' && prevArmState === 'down' && framesSinceRep === 0) {
+                    if (bestAngle > HIGH_THRESHOLD && isDown && framesSinceRep === 0) {
                         repCount++;
-                        framesSinceRep = 10; // Подождать 10 кадров
-                    }
 
-                    // Обновляем предыдущее состояние
-                    if (armState !== 'neutral') {
-                        prevArmState = armState;
+                        // Проверяем, было ли это качественное повторение
+                        if (currentRepMin <= QUALITY_LOW && currentRepMax >= QUALITY_HIGH) {
+                            qualityReps++;
+                        }
+
+                        isDown = false;
+                        framesSinceRep = 10;
+                        currentRepMax = 0;
+                        currentRepMin = 180;
                     }
                 }
             }
             requestAnimationFrame(detectTechnique);
+        }
+
+        function calculateAngle(a, b, c) {
+            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
+            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
         }
     </script>
 </body>
