@@ -213,11 +213,7 @@
         let techFrames = 0;
         let repCount = 0;
         let qualityReps = 0;
-        let prevAngle = null;
-        let isDropping = false;
-        let isRising = false;
-        let dropAccumulator = 0;
-        let riseAccumulator = 0;
+        let angleWindow = []; // Скользящее окно углов
         let framesSinceRep = 0;
 
         async function initPose() {
@@ -252,11 +248,7 @@
         function resetCounters() {
             repCount = 0;
             qualityReps = 0;
-            prevAngle = null;
-            isDropping = false;
-            isRising = false;
-            dropAccumulator = 0;
-            riseAccumulator = 0;
+            angleWindow = [];
             framesSinceRep = 0;
         }
 
@@ -331,7 +323,7 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: ДИФФЕРЕНЦИАЛЬНЫЙ АНАЛИЗ (по разнице углов между кадрами)
+        // НОВАЯ ЛОГИКА: ГЛОБАЛЬНОЕ СКОЛЬЗЯЩЕЕ ОКНО
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -363,37 +355,27 @@
                 }
 
                 if (bestAngle !== null) {
-                    if (prevAngle !== null) {
-                        const diff = bestAngle - prevAngle;
+                    // Добавляем угол в окно
+                    angleWindow.push(bestAngle);
+                    if (angleWindow.length > 10) angleWindow.shift();
 
-                        // Если угол падает (отрицательная разница)
-                        if (diff < -5) {
-                            dropAccumulator += Math.abs(diff);
-                            if (dropAccumulator > 15) {
-                                isDropping = true;
-                            }
-                        } else if (diff > 5) {
-                            riseAccumulator += diff;
-                            if (riseAccumulator > 15) {
-                                isRising = true;
-                            }
-                        }
+                    // Если накопилось достаточно данных, ищем минимум и максимум в окне
+                    if (angleWindow.length === 10) {
+                        const minVal = Math.min(...angleWindow);
+                        const maxVal = Math.max(...angleWindow);
+                        const difference = maxVal - minVal;
 
-                        // Если мы видели падение и потом рост, считаем повторение
-                        if (isDropping && isRising && framesSinceRep === 0) {
+                        // Проверяем, был ли значительный диапазон движения (более 20 градусов)
+                        if (difference > 20 && framesSinceRep === 0) {
                             repCount++;
-                            // Качество: если падение и рост были значительными
-                            if (dropAccumulator > 30 && riseAccumulator > 30) {
+                            // Качество: большой диапазон = качественное повторение
+                            if (difference > 45) {
                                 qualityReps++;
                             }
-                            isDropping = false;
-                            isRising = false;
-                            dropAccumulator = 0;
-                            riseAccumulator = 0;
+                            angleWindow = [];
                             framesSinceRep = 10;
                         }
                     }
-                    prevAngle = bestAngle;
 
                     if (framesSinceRep > 0) framesSinceRep--;
                 }
