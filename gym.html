@@ -217,12 +217,12 @@
         let framesSinceRep = 0;
         let smoothing = [];
 
-        const LOW_THRESHOLD = 110;
-        const HIGH_THRESHOLD = 135;
-        const QUALITY_LOW = 105;
-        const QUALITY_HIGH = 145;
+        // НАСТРОЙКА ПОРОГОВ (под жим сбоку)
+        const LOW_THRESHOLD = 100;
+        const HIGH_THRESHOLD = 130;
+        const QUALITY_LOW = 95;
+        const QUALITY_HIGH = 140;
 
-        // УЛУЧШЕННАЯ ТОЧНОСТЬ: Большее разрешение и multiplier
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
@@ -362,9 +362,9 @@
                 }
 
                 if (bestAngle !== null) {
-                    // Сглаживание (5 последних значений)
+                    // Мягкое сглаживание (3 кадра)
                     smoothing.push(bestAngle);
-                    if (smoothing.length > 5) smoothing.shift();
+                    if (smoothing.length > 3) smoothing.shift();
                     const smoothedAngle = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
 
                     if (framesSinceRep > 0) framesSinceRep--;
