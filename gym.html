@@ -213,11 +213,11 @@
         let techFrames = 0;
         let repCount = 0;
         let qualityReps = 0;
-        let angleHistory = [];
-        let minAngle = 180;
-        let maxAngle = 0;
-        let lastValley = null;
-        let lastPeak = null;
+        let prevAngle = null;
+        let isDropping = false;
+        let isRising = false;
+        let dropAccumulator = 0;
+        let riseAccumulator = 0;
         let framesSinceRep = 0;
 
         async function initPose() {
@@ -252,11 +252,11 @@
         function resetCounters() {
             repCount = 0;
             qualityReps = 0;
-            angleHistory = [];
-            minAngle = 180;
-            maxAngle = 0;
-            lastValley = null;
-            lastPeak = null;
+            prevAngle = null;
+            isDropping = false;
+            isRising = false;
+            dropAccumulator = 0;
+            riseAccumulator = 0;
             framesSinceRep = 0;
         }
 
@@ -331,7 +331,7 @@
             }
         }
 
-        // АЛГОРИТМ ПОИСКА ПИКОВ (Peak Detection)
+        // НОВАЯ ЛОГИКА: ДИФФЕРЕНЦИАЛЬНЫЙ АНАЛИЗ (по разнице углов между кадрами)
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -363,51 +363,39 @@
                 }
 
                 if (bestAngle !== null) {
-                    if (bestAngle > maxAngle) maxAngle = bestAngle;
-                    if (bestAngle < minAngle) minAngle = bestAngle;
+                    if (prevAngle !== null) {
+                        const diff = bestAngle - prevAngle;
 
-                    // Сохраняем в историю сглаживание
-                    angleHistory.push(bestAngle);
-                    if (angleHistory.length > 5) angleHistory.shift();
+                        // Если угол падает (отрицательная разница)
+                        if (diff < -5) {
+                            dropAccumulator += Math.abs(diff);
+                            if (dropAccumulator > 15) {
+                                isDropping = true;
+                            }
+                        } else if (diff > 5) {
+                            riseAccumulator += diff;
+                            if (riseAccumulator > 15) {
+                                isRising = true;
+                            }
+                        }
 
-                    // Определяем тренд (возрастает или убывает)
-                    let trend = 'flat';
-                    if (angleHistory.length >= 3) {
-                        const first = angleHistory[0];
-                        const last = angleHistory[angleHistory.length - 1];
-                        if (last < first - 2) trend = 'down';
-                        else if (last > first + 2) trend = 'up';
-                    }
-
-                    // Ищем локальную впадину (минимум) - рука согнута
-                    if (trend === 'up' && lastValley !== null) {
-                        const recentMin = Math.min(...angleHistory.slice(-3));
-                        if (angleHistory[angleHistory.length - 1] > recentMin + 5) {
-                            lastPeak = angleHistory[angleHistory.length - 1];
-                            lastValley = null;
+                        // Если мы видели падение и потом рост, считаем повторение
+                        if (isDropping && isRising && framesSinceRep === 0) {
+                            repCount++;
+                            // Качество: если падение и рост были значительными
+                            if (dropAccumulator > 30 && riseAccumulator > 30) {
+                                qualityReps++;
+                            }
+                            isDropping = false;
+                            isRising = false;
+                            dropAccumulator = 0;
+                            riseAccumulator = 0;
+                            framesSinceRep = 10;
                         }
                     }
+                    prevAngle = bestAngle;
 
-                    // Ищем локальный пик (максимум) - рука выпрямлена
-                    if (trend === 'down' && lastPeak !== null) {
-                        const recentMax = Math.max(...angleHistory.slice(-3));
-                        if (angleHistory[angleHistory.length - 1] < recentMax - 5) {
-                            lastValley = angleHistory[angleHistory.length - 1];
-                            lastPeak = null;
-                        }
-                    }
-
-                    // Если после пика последовала впадина и снова пик - повторение
-                    if (lastValley !== null && lastPeak === null && trend === 'up' && angleHistory[angleHistory.length - 1] > lastValley + 20) {
-                        repCount++;
-                        // Качество: впадина глубокая (угол маленький) и пик высокий (угол большой)
-                        if (lastValley < 120 && maxAngle > 150) {
-                            qualityReps++;
-                        }
-                        lastValley = null;
-                        angleHistory = [];
-                        framesSinceRep = 10;
-                    }
+                    if (framesSinceRep > 0) framesSinceRep--;
                 }
             }
             requestAnimationFrame(detectTechnique);
