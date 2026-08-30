@@ -213,17 +213,17 @@
         let techFrames = 0;
         let repCount = 0;
         let qualityReps = 0;
-        let downFlag = false;
-        let upFlag = false;
+        let isExtended = false;
+        let isContracted = false;
         let framesSinceRep = 0;
-        let prevWristY = null;
-        let wristHistory = [];
+        let distHistory = [];
+        let minDist = 9999;
+        let maxDist = 0;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (MoveNet)...";
             try {
                 await tf.ready();
-                // Загружаем MoveNet с тем же CDN, что и TensorFlow
                 const model = poseDetection.SupportedModels.MoveNet;
                 detector = await poseDetection.createDetector(model, { modelType: 'SinglePose.Lightning' });
                 statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
@@ -253,11 +253,12 @@
         function resetCounters() {
             repCount = 0;
             qualityReps = 0;
-            downFlag = false;
-            upFlag = false;
+            isExtended = false;
+            isContracted = false;
             framesSinceRep = 0;
-            prevWristY = null;
-            wristHistory = [];
+            distHistory = [];
+            minDist = 9999;
+            maxDist = 0;
         }
 
         uploadTechBtn.onclick = () => techUploadInput.click();
@@ -331,7 +332,7 @@
             }
         }
 
-        // ЛОГИКА: отслеживаем положение запястья относительно бедра (вертикаль)
+        // НОВАЯ ЛОГИКА: РАССТОЯНИЕ МЕЖДУ ЗАПЯСТЬЕМ И ПЛЕЧОМ
         async function detectTechnique() {
             if (techVideo.readyState < 2 || !detector) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
@@ -342,58 +343,60 @@
                 const keypoints = poses[0].keypoints;
                 drawSkeleton(keypoints);
 
-                // Используем точки MoveNet: 11 = левое плечо, 23 = левое бедро, 9 = левое запястье
                 const leftShoulder = keypoints[11];
-                const leftHip = keypoints[23];
                 const leftWrist = keypoints[9];
                 const rightShoulder = keypoints[12];
-                const rightHip = keypoints[24];
                 const rightWrist = keypoints[10];
 
-                let wrist = null;
-                let hip = null;
-
-                if (leftWrist && leftHip && leftWrist.score > 0.4 && leftHip.score > 0.4) {
-                    wrist = leftWrist.position;
-                    hip = leftHip.position;
-                } else if (rightWrist && rightHip && rightWrist.score > 0.4 && rightHip.score > 0.4) {
-                    wrist = rightWrist.position;
-                    hip = rightHip.position;
+                let dist = null;
+                if (leftShoulder && leftWrist && leftShoulder.score > 0.4 && leftWrist.score > 0.4) {
+                    const dx = leftWrist.position.x - leftShoulder.position.x;
+                    const dy = leftWrist.position.y - leftShoulder.position.y;
+                    dist = Math.sqrt(dx * dx + dy * dy);
+                } else if (rightShoulder && rightWrist && rightShoulder.score > 0.4 && rightWrist.score > 0.4) {
+                    const dx = rightWrist.position.x - rightShoulder.position.x;
+                    const dy = rightWrist.position.y - rightShoulder.position.y;
+                    dist = Math.sqrt(dx * dx + dy * dy);
                 }
 
-                if (wrist && hip) {
-                    // diffY: положительное = запястье ниже бедра, отрицательное = выше бедра
-                    const diffY = wrist.y - hip.y;
-                    
-                    // Сглаживание по 3 кадрам
-                    wristHistory.push(diffY);
-                    if (wristHistory.length > 3) wristHistory.shift();
-                    const smoothedDiff = wristHistory.reduce((a,b) => a+b, 0) / wristHistory.length;
+                if (dist !== null) {
+                    // Отладочная информация
+                    statusTech.innerText = "Статус: Расстояние = " + Math.round(dist) + " px. Повторений = " + repCount;
+
+                    distHistory.push(dist);
+                    if (distHistory.length > 3) distHistory.shift();
+                    const smoothedDist = distHistory.reduce((a,b) => a+b, 0) / distHistory.length;
+
+                    // Обновляем максимумы и минимумы
+                    if (smoothedDist > maxDist) maxDist = smoothedDist;
+                    if (smoothedDist < minDist) minDist = smoothedDist;
 
                     if (framesSinceRep > 0) framesSinceRep--;
 
-                    // Логика: если запястье опустилось ниже бедра (> 15) - флаг вниз
-                    // Если поднялось выше бедра (< -15) - флаг вверх
-                    if (smoothedDiff > 15) {
-                        downFlag = true;
+                    // Логика: если расстояние стало большим (> 90% от maxDist) - рука выпрямлена (extended)
+                    // Если стало маленьким (< 60% от maxDist) - рука согнута (contracted)
+                    if (maxDist > 0 && smoothedDist > maxDist * 0.9) {
+                        isExtended = true;
                     }
-                    if (smoothedDiff < -15) {
-                        upFlag = true;
+                    if (minDist < 9999 && smoothedDist < maxDist * 0.6) {
+                        isContracted = true;
                     }
 
-                    // Повторение засчитывается: вниз был, потом вверх
-                    if (downFlag && upFlag && framesSinceRep === 0) {
+                    // Повторение засчитывается, когда рука была выпрямлена, потом согнута, потом снова выпрямлена
+                    if (isExtended && isContracted && framesSinceRep === 0) {
                         repCount++;
-                        
-                        // Качество: проверяем глубину хода (вниз и вверх)
-                        if (smoothedDiff > 30 || smoothedDiff < -30) {
+
+                        // Качество: проверяем, была ли амплитуда большой (значительное изменение расстояния)
+                        if (maxDist - minDist > 100) {
                             qualityReps++;
                         }
-                        
-                        downFlag = false;
-                        upFlag = false;
+
+                        isExtended = false;
+                        isContracted = false;
                         framesSinceRep = 10;
-                        wristHistory = [];
+                        distHistory = [];
+                        minDist = 9999;
+                        maxDist = 0;
                     }
                 }
             }
