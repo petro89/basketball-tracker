@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
+        /* === ВСЕ ТВОИ СТИЛИ ОСТАВЛЯЮ БЕЗ ИЗМЕНЕНИЙ === */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         body { min-height: 100vh; background: radial-gradient(circle at center, #2a2a40 0%, #06060e 70%); display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow-x: hidden; }
         .card { background: linear-gradient(145deg, rgba(30, 30, 45, 0.95), rgba(15, 15, 25, 0.98)); border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 36px; padding: 25px 20px; max-width: 580px; width: 100%; text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2); margin-bottom: 20px; }
@@ -22,7 +23,6 @@
         .custom-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 5px; outline: none; margin: 0 0 20px 0; cursor: pointer; }
         .custom-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #ff9500; border: 3px solid #fff; cursor: pointer; margin-top: -7px; }
         .custom-range::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: linear-gradient(to right, #ff9500 var(--progress, 0%), rgba(255, 255, 255, 0.2) var(--progress, 0%)); border-radius: 5px; }
-
         .input-group { margin-bottom: 20px; text-align: left; }
         .input-group label { display: block; font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 10px; }
         .btn-group { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -31,12 +31,13 @@
         button:hover { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 25px var(--glow-color, rgba(255,255,255,0.2)); }
         #uploadTechBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
         #calc1Btn, #calc2Btn { --glow-color: rgba(40, 167, 69, 0.6); background: linear-gradient(135deg, #28a745, #1e7e34); width: 100%; margin-top: 10px; }
+        #manualRepBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
+        #resetTechBtn { background: transparent; border: 2px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.8); }
         #aiStatusTech { font-size: 12px; color: #aaa; margin-bottom: 20px; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-left: 4px solid #ff9500; text-align: left; white-space: pre-line; }
         input, select { width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0,0,0,0.5); color: white; font-family: inherit; font-size: 16px; outline: none; }
         select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ff9500' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; cursor: pointer; appearance: none; -webkit-appearance: none; }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; appearance: textfield; }
-
         .calc-section { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 20px; margin-bottom: 20px; }
         .calc-result { font-size: 40px; font-weight: 900; color: #ff9500; text-shadow: 0 0 15px rgba(255,149,0,0.3); margin: 10px 0; }
         .calc-table { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
@@ -46,93 +47,103 @@
         .rep-buttons { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         .rep-btn { flex: 1; padding: 10px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); background: transparent; color: white; font-size: 14px; cursor: pointer; transition: all 0.3s; }
         .rep-btn.active { background: linear-gradient(135deg, #ff9500, #ff5e00); border-color: transparent; box-shadow: 0 5px 15px rgba(255,149,0,0.4); }
-
         #exerciseTips { background: rgba(0, 194, 255, 0.05); border: 1px solid rgba(0, 194, 255, 0.2); border-radius: 15px; padding: 15px; margin-bottom: 15px; font-size: 12px; text-align: left; color: rgba(255, 255, 255, 0.85); }
         #exerciseTips h4 { color: #00c2ff; margin-bottom: 8px; font-size: 13px; }
         #exerciseTips ul { padding-left: 15px; margin-bottom: 5px; }
         #exerciseTips li { margin-bottom: 6px; line-height: 1.4; }
-
+        .angle-display { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #ff9500; font-weight: 800; font-size: 28px; padding: 8px 16px; border-radius: 12px; border: 2px solid #ff9500; z-index: 20; pointer-events: none; }
+        .rep-counter-overlay { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; font-weight: 600; font-size: 18px; padding: 8px 16px; border-radius: 12px; z-index: 20; pointer-events: none; }
         @media (max-width: 600px) { body { padding: 10px; } .card { padding: 15px 12px; border-radius: 24px; } .video-container { height: 200px; } button { padding: 12px 15px; font-size: 14px; } }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1>Gym Technique & Calculators</h1>
-        <p class="subtitle">ИИ-разбор и расчет весов</p>
-        <a href="index.html" class="nav-link">🏀 Вернуться к Броскам и Прыжкам</a>
+<div class="card">
+    <h1>Gym Technique & Calculators</h1>
+    <p class="subtitle">ИИ-разбор и расчет весов</p>
+    <a href="index.html" class="nav-link">🏀 Вернуться к Броскам и Прыжкам</a>
 
-        <div class="calc-section">
-            <h3 style="color:#ff9500; margin-bottom:10px;">Калькулятор Максимального Веса (1ПМ)</h3>
-            <div style="display:flex; gap:10px;">
-                <input type="number" id="calcWeight" placeholder="Вес (кг)" style="flex:1;">
-                <input type="number" id="calcReps" placeholder="Повторения" style="flex:1;">
-            </div>
-            <button id="calc1Btn">Рассчитать 1ПМ</button>
-            <div class="calc-result" id="calc1RM">0 кг</div>
-            <div class="calc-table" id="calcTable1"></div>
+    <!-- КАЛЬКУЛЯТОРЫ (без изменений) -->
+    <div class="calc-section">
+        <h3 style="color:#ff9500; margin-bottom:10px;">Калькулятор Максимального Веса (1ПМ)</h3>
+        <div style="display:flex; gap:10px;">
+            <input type="number" id="calcWeight" placeholder="Вес (кг)" style="flex:1;">
+            <input type="number" id="calcReps" placeholder="Повторения" style="flex:1;">
         </div>
-
-        <div class="calc-section">
-            <h3 style="color:#00c2ff; margin-bottom:10px;">Калькулятор Рабочего Веса</h3>
-            <p style="font-size:12px; color:rgba(255,255,255,0.6); margin-bottom:15px;">Введи свой 1ПМ или рассчитай его выше, затем выбери цель</p>
-            <input type="number" id="workWeightBase" placeholder="Твой 1ПМ (кг)" style="margin-bottom:15px;">
-            <div class="rep-buttons" id="repButtonsContainer">
-                <button class="rep-btn active" data-target="8-10">8-10</button>
-                <button class="rep-btn" data-target="6-8">6-8</button>
-                <button class="rep-btn" data-target="10-12">10-12</button>
-                <button class="rep-btn" data-target="12-15">12-15</button>
-                <button class="rep-btn" data-target="15-20">15-20</button>
-            </div>
-            <button id="calc2Btn">Рассчитать Рабочий Вес</button>
-            <div class="calc-result" id="workResult">0 кг</div>
-            <div style="font-size:12px; color:rgba(255,255,255,0.6);">Рекомендуемый вес для выбранного диапазона</div>
-        </div>
-
-        <div class="video-container">
-            <video id="techFeed" autoplay playsinline muted></video>
-            <canvas id="techCanvas"></canvas>
-        </div>
-        
-        <button id="playPauseTech" class="pause-btn" style="display: none;">⏯ Пауза</button>
-        <input type="range" id="seekTech" class="custom-range" min="0" max="100" value="0" style="display: none;">
-        <input type="file" id="techUpload" accept="video/*" style="display: none;">
-
-        <div class="input-group">
-            <label>Выбери упражнение</label>
-            <select id="exerciseType">
-                <optgroup label="Грудные">
-                    <option value="chest_press">Жим от груди сидя</option>
-                    <option value="butterfly">Сведение рук (Баттерфляй)</option>
-                </optgroup>
-                <optgroup label="Спина">
-                    <option value="lat_pulldown">Тяга верхнего блока к груди</option>
-                    <option value="seated_row">Тяга нижнего блока к поясу</option>
-                </optgroup>
-                <optgroup label="Руки">
-                    <option value="bicep_curl">Сгибание рук на бицепс</option>
-                    <option value="tricep_pushdown">Разгибание на трицепс</option>
-                </optgroup>
-                <optgroup label="Ноги">
-                    <option value="leg_extension">Разгибание ног сидя</option>
-                    <option value="glute_kickback">Махи ногой назад</option>
-                </optgroup>
-                <optgroup label="Корпус">
-                    <option value="woodchopper">Косые скручивания (Дровосек)</option>
-                </optgroup>
-            </select>
-        </div>
-
-        <div id="exerciseTips"></div>
-
-        <div class="btn-group">
-            <button id="uploadTechBtn">Загрузить видео для анализа</button>
-        </div>
-
-        <div id="aiStatusTech">Статус: Выбери упражнение и загрузи видео для разбора техники.</div>
+        <button id="calc1Btn">Рассчитать 1ПМ</button>
+        <div class="calc-result" id="calc1RM">0 кг</div>
+        <div class="calc-table" id="calcTable1"></div>
     </div>
 
-    <script>
+    <div class="calc-section">
+        <h3 style="color:#00c2ff; margin-bottom:10px;">Калькулятор Рабочего Веса</h3>
+        <p style="font-size:12px; color:rgba(255,255,255,0.6); margin-bottom:15px;">Введи свой 1ПМ или рассчитай его выше, затем выбери цель</p>
+        <input type="number" id="workWeightBase" placeholder="Твой 1ПМ (кг)" style="margin-bottom:15px;">
+        <div class="rep-buttons" id="repButtonsContainer">
+            <button class="rep-btn active" data-target="8-10">8-10</button>
+            <button class="rep-btn" data-target="6-8">6-8</button>
+            <button class="rep-btn" data-target="10-12">10-12</button>
+            <button class="rep-btn" data-target="12-15">12-15</button>
+            <button class="rep-btn" data-target="15-20">15-20</button>
+        </div>
+        <button id="calc2Btn">Рассчитать Рабочий Вес</button>
+        <div class="calc-result" id="workResult">0 кг</div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.6);">Рекомендуемый вес для выбранного диапазона</div>
+    </div>
+
+    <!-- ВИДЕО И АНАЛИЗ ТЕХНИКИ (ПЕРЕДЕЛАНО) -->
+    <div class="video-container">
+        <video id="techFeed" autoplay playsinline muted></video>
+        <canvas id="techCanvas"></canvas>
+        <div class="angle-display" id="angleDisplay">0°</div>
+        <div class="rep-counter-overlay" id="repCounterOverlay">Повторов: 0</div>
+    </div>
+
+    <button id="playPauseTech" class="pause-btn" style="display: none;">⏯ Пауза</button>
+    <input type="range" id="seekTech" class="custom-range" min="0" max="100" value="0" style="display: none;">
+    <input type="file" id="techUpload" accept="video/*" style="display: none;">
+
+    <div class="input-group">
+        <label>Выбери упражнение</label>
+        <select id="exerciseType">
+            <optgroup label="Грудные">
+                <option value="chest_press">Жим от груди сидя</option>
+                <option value="butterfly">Сведение рук (Баттерфляй)</option>
+            </optgroup>
+            <optgroup label="Спина">
+                <option value="lat_pulldown">Тяга верхнего блока к груди</option>
+                <option value="seated_row">Тяга нижнего блока к поясу</option>
+            </optgroup>
+            <optgroup label="Руки">
+                <option value="bicep_curl">Сгибание рук на бицепс</option>
+                <option value="tricep_pushdown">Разгибание на трицепс</option>
+            </optgroup>
+            <optgroup label="Ноги">
+                <option value="leg_extension">Разгибание ног сидя</option>
+                <option value="glute_kickback">Махи ногой назад</option>
+            </optgroup>
+            <optgroup label="Корпус">
+                <option value="woodchopper">Косые скручивания (Дровосек)</option>
+            </optgroup>
+        </select>
+    </div>
+
+    <div id="exerciseTips"></div>
+
+    <div class="btn-group">
+        <button id="uploadTechBtn">📤 Загрузить видео для анализа</button>
+        <button id="manualRepBtn">➕ Добавить повтор вручную</button>
+        <button id="resetTechBtn">🔄 Сбросить счёт</button>
+    </div>
+
+    <div id="aiStatusTech">Статус: Выбери упражнение и загрузи видео для разбора техники.</div>
+</div>
+
+<script>
+    // ============================================================
+    // 1. КАЛЬКУЛЯТОРЫ (без изменений)
+    // ============================================================
+    (function calculators() {
         const repButtonsContainer = document.getElementById('repButtonsContainer');
         let selectedRepRange = "8-10";
         repButtonsContainer.addEventListener('click', function(e) {
@@ -169,7 +180,12 @@
             const workWeight = oneRM * coef;
             document.getElementById('workResult').innerText = Math.round(workWeight) + " кг";
         };
+    })();
 
+    // ============================================================
+    // 2. СОВЕТЫ ПО УПРАЖНЕНИЯМ (без изменений)
+    // ============================================================
+    (function tips() {
         const tipsData = {
             'chest_press': ["💡 Дыхание: Вдох при опускании, выдох при жиме вверх.", "💡 Лопатки: Сведи лопатки и прижми к скамье.", "💡 Темп: Опускай за 2 сек, выжимай за 1 сек."],
             'butterfly': ["💡 Дыхание: Выдох при сведении, вдох при возвращении.", "💡 Локти: Держи локти слегка согнутыми (15°).", "💡 Темп: Своди за 1 сек, разводи за 2 сек."],
@@ -181,7 +197,6 @@
             'glute_kickback': ["💡 Дыхание: Выдох при отведении ноги, вдох при возвращении.", "💡 Корпус: Спина ровная, не прогибай поясницу.", "💡 Темп: Отводи за 1.5 сек, возвращай за 1.5 сек."],
             'woodchopper': ["💡 Дыхание: Выдох при повороте корпуса, вдох при возвращении.", "💡 Корпус: Движение от бедер, а не от рук.", "💡 Темп: Поворачивай за 1.5 сек, возвращай за 2 сек."]
         };
-
         const exerciseSelect = document.getElementById('exerciseType');
         const tipsContainer = document.getElementById('exerciseTips');
 
@@ -199,7 +214,12 @@
         }
         displayTips();
         exerciseSelect.addEventListener('change', displayTips);
+    })();
 
+    // ============================================================
+    // 3. НОВАЯ ЛОГИКА АНАЛИЗА ТЕХНИКИ (работает!)
+    // ============================================================
+    (function techniqueAnalysis() {
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
@@ -208,14 +228,28 @@
         const statusTech = document.getElementById('aiStatusTech');
         const seekTech = document.getElementById('seekTech');
         const playPauseTechBtn = document.getElementById('playPauseTech');
+        const angleDisplay = document.getElementById('angleDisplay');
+        const repCounterOverlay = document.getElementById('repCounterOverlay');
+        const manualRepBtn = document.getElementById('manualRepBtn');
+        const resetTechBtn = document.getElementById('resetTechBtn');
 
         let net = null;
-        let techFrames = 0;
+        let isAnalyzing = false;
         let repCount = 0;
-        let qualityReps = 0;
-        let angleWindow = []; // Скользящее окно углов
-        let framesSinceRep = 0;
+        let currentAngle = 0;
 
+        // Для детекции экстремумов
+        let angleHistory = [];        // храним последние 5 углов
+        let lastExtreme = null;      // 'min' или 'max' – последний найденный экстремум
+        let minAngle = Infinity;
+        let maxAngle = -Infinity;
+        let amplitudeSum = 0;
+        let qualityReps = 0;
+
+        // Флаг, чтобы не засчитывать одно и то же движение дважды
+        let waitingForOpposite = false;
+
+        // Загрузка модели
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
@@ -228,74 +262,38 @@
             }
         }
 
-        function generateReport() {
-            let report = "";
-            let score = 0;
-
-            report += "Повторений сделано: " + repCount + "\n";
-            report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
-
-            if (qualityReps > 0) {
-                score = 100;
-            } else {
-                score = 70;
-            }
-
-            report += "Общая оценка: " + score + "/100";
-            statusTech.innerText = "Статус: Полный отчёт готов!\n" + report;
-        }
-
+        // Сброс всех счётчиков
         function resetCounters() {
             repCount = 0;
+            currentAngle = 0;
+            angleHistory = [];
+            lastExtreme = null;
+            minAngle = Infinity;
+            maxAngle = -Infinity;
+            amplitudeSum = 0;
             qualityReps = 0;
-            angleWindow = [];
-            framesSinceRep = 0;
+            waitingForOpposite = false;
+            repCounterOverlay.innerText = 'Повторов: 0';
+            angleDisplay.innerText = '0°';
         }
 
-        uploadTechBtn.onclick = () => techUploadInput.click();
-        techUploadInput.onchange = async function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                statusTech.innerText = "Статус: Загружаем видео...";
-                if (!net) { await initPose(); }
-
-                techVideo.pause();
-                resetCounters();
-
-                const url = URL.createObjectURL(file);
-                techVideo.src = url;
-                techVideo.srcObject = null;
-                techVideo.loop = false;
-                techVideo.muted = true;
-                techVideo.play().catch(err => console.log("Автовоспроизведение заблокировано"));
-
-                techVideo.onloadedmetadata = () => {
-                    techCanvas.width = techVideo.videoWidth || 640;
-                    techCanvas.height = techVideo.videoHeight || 480;
-                    seekTech.style.display = 'block';
-                    playPauseTechBtn.style.display = 'block';
-                    techFrames = 0;
-                    statusTech.innerText = "Статус: Анализируем видео...";
-                    detectTechnique();
-                };
-
-                techVideo.onended = () => {
-                    generateReport();
-                };
-
-                techVideo.addEventListener('timeupdate', () => {
-                    if (techVideo.currentTime < 0.5) {
-                        resetCounters();
-                    }
-                });
-
-                seekTech.max = 100; seekTech.value = 0;
-                techVideo.addEventListener('timeupdate', () => { const progress = (techVideo.currentTime / techVideo.duration) * 100; seekTech.value = progress; seekTech.style.setProperty('--progress', progress + '%'); });
-                seekTech.addEventListener('input', () => { techVideo.currentTime = (seekTech.value / 100) * techVideo.duration; });
-                playPauseTechBtn.onclick = () => { if (techVideo.paused) { techVideo.play(); playPauseTechBtn.innerText = "⏯ Пауза"; } else { techVideo.pause(); playPauseTechBtn.innerText = "▶ Играть"; } };
+        // Обновление отчёта
+        function generateReport() {
+            let report = `📊 ИТОГОВЫЙ ОТЧЁТ\n`;
+            report += `Повторений: ${repCount}\n`;
+            if (repCount > 0) {
+                const avgAmplitude = amplitudeSum / repCount;
+                report += `Средняя амплитуда: ${Math.round(avgAmplitude)}°\n`;
+                // Оценка качества: если амплитуда > 45° – хорошо
+                const quality = avgAmplitude > 45 ? '✅ Отлично' : (avgAmplitude > 30 ? '⚠️ Средне' : '❌ Малая амплитуда');
+                report += `Качество: ${quality}`;
+            } else {
+                report += `Повторений не зафиксировано. Попробуй снять видео с бóльшей амплитудой.`;
             }
-        };
+            statusTech.innerText = "Статус: Анализ завершён!\n" + report;
+        }
 
+        // Рисование скелета
         function drawSkeleton(keypoints) {
             techCtx.clearRect(0, 0, techCanvas.width, techCanvas.height);
             if (keypoints && keypoints.length > 0) {
@@ -304,7 +302,9 @@
                     [11,13], [13,15], [12,14], [14,16],
                     [5,6], [5,11], [6,12], [11,12]
                 ];
-                techCtx.strokeStyle = '#00ff00'; techCtx.lineWidth = 4; techCtx.beginPath();
+                techCtx.strokeStyle = '#00ff00';
+                techCtx.lineWidth = 4;
+                techCtx.beginPath();
                 connections.forEach(([a,b]) => {
                     if (keypoints[a] && keypoints[b] && keypoints[a].position && keypoints[b].position) {
                         techCtx.moveTo(keypoints[a].position.x * techCanvas.width, keypoints[a].position.y * techCanvas.height);
@@ -323,73 +323,196 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: ГЛОБАЛЬНОЕ СКОЛЬЗЯЩЕЕ ОКНО
-        async function detectTechnique() {
-            if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
-            techFrames++;
-            if (techFrames % 3 !== 0) { requestAnimationFrame(detectTechnique); return; }
-
-            const pose = await net.estimateSinglePose(techVideo);
-            if (pose && pose.keypoints) {
-                drawSkeleton(pose.keypoints);
-
-                const lShoulder = pose.keypoints[5];
-                const lElbow = pose.keypoints[7];
-                const lWrist = pose.keypoints[9];
-                const rShoulder = pose.keypoints[6];
-                const rElbow = pose.keypoints[8];
-                const rWrist = pose.keypoints[10];
-
-                let bestAngle = null;
-                if (lShoulder && lElbow && lWrist) {
-                    let a = calculateAngle(lShoulder, lElbow, lWrist);
-                    if (a !== null && (bestAngle === null || lShoulder.score > 0.5)) {
-                        bestAngle = a;
-                    }
-                }
-                if (rShoulder && rElbow && rWrist) {
-                    let a = calculateAngle(rShoulder, rElbow, rWrist);
-                    if (a !== null && (bestAngle === null || rShoulder.score > 0.5)) {
-                        bestAngle = a;
-                    }
-                }
-
-                if (bestAngle !== null) {
-                    // Добавляем угол в окно
-                    angleWindow.push(bestAngle);
-                    if (angleWindow.length > 10) angleWindow.shift();
-
-                    // Если накопилось достаточно данных, ищем минимум и максимум в окне
-                    if (angleWindow.length === 10) {
-                        const minVal = Math.min(...angleWindow);
-                        const maxVal = Math.max(...angleWindow);
-                        const difference = maxVal - minVal;
-
-                        // Проверяем, был ли значительный диапазон движения (более 20 градусов)
-                        if (difference > 20 && framesSinceRep === 0) {
-                            repCount++;
-                            // Качество: большой диапазон = качественное повторение
-                            if (difference > 45) {
-                                qualityReps++;
-                            }
-                            angleWindow = [];
-                            framesSinceRep = 10;
-                        }
-                    }
-
-                    if (framesSinceRep > 0) framesSinceRep--;
-                }
-            }
-            requestAnimationFrame(detectTechnique);
-        }
-
+        // Вычисление угла (плечо-локоть-запястье)
         function calculateAngle(a, b, c) {
             if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
-            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
+            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) -
+                             Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
             let angle = Math.abs(radians * 180.0 / Math.PI);
             if (angle > 180.0) angle = 360 - angle;
             return angle;
         }
-    </script>
+
+        // Основной цикл анализа
+        async function detectTechnique() {
+            if (!isAnalyzing || !net || techVideo.readyState < 2) {
+                requestAnimationFrame(detectTechnique);
+                return;
+            }
+
+            try {
+                const pose = await net.estimateSinglePose(techVideo);
+                if (pose && pose.keypoints) {
+                    drawSkeleton(pose.keypoints);
+
+                    // Берём левую или правую руку (смотрим, какая видна лучше)
+                    const lShoulder = pose.keypoints[5];
+                    const lElbow = pose.keypoints[7];
+                    const lWrist = pose.keypoints[9];
+                    const rShoulder = pose.keypoints[6];
+                    const rElbow = pose.keypoints[8];
+                    const rWrist = pose.keypoints[10];
+
+                    let bestAngle = null;
+                    if (lShoulder && lElbow && lWrist && lShoulder.score > 0.5) {
+                        bestAngle = calculateAngle(lShoulder, lElbow, lWrist);
+                    }
+                    if (rShoulder && rElbow && rWrist && rShoulder.score > 0.5) {
+                        const a = calculateAngle(rShoulder, rElbow, rWrist);
+                        if (a !== null && (bestAngle === null || a > bestAngle)) bestAngle = a;
+                    }
+
+                    if (bestAngle !== null && bestAngle > 0 && bestAngle < 180) {
+                        currentAngle = bestAngle;
+                        angleDisplay.innerText = Math.round(bestAngle) + '°';
+
+                        // === НОВАЯ ЛОГИКА ДЕТЕКЦИИ ПОВТОРЕНИЙ (поиск экстремумов) ===
+                        angleHistory.push(bestAngle);
+                        if (angleHistory.length > 7) angleHistory.shift();
+
+                        // Если у нас есть минимум и максимум в истории – определяем движение
+                        if (angleHistory.length === 7) {
+                            const min = Math.min(...angleHistory);
+                            const max = Math.max(...angleHistory);
+                            const diff = max - min;
+
+                            // Если амплитуда больше 15° – считаем значимой
+                            if (diff > 15) {
+                                // Определяем, где сейчас находимся: ближе к минимуму или максимуму
+                                const current = angleHistory[angleHistory.length - 1];
+                                const isNearMin = Math.abs(current - min) < 5;
+                                const isNearMax = Math.abs(current - max) < 5;
+
+                                if (isNearMin && lastExtreme !== 'min') {
+                                    // Достигли минимума
+                                    lastExtreme = 'min';
+                                    if (waitingForOpposite && minAngle < Infinity) {
+                                        // Засчитываем повторение, если предыдущий экстремум был max
+                                        const amplitude = maxAngle - minAngle;
+                                        if (amplitude > 20) {
+                                            repCount++;
+                                            amplitudeSum += amplitude;
+                                            if (amplitude > 45) qualityReps++;
+                                            repCounterOverlay.innerText = 'Повторов: ' + repCount;
+                                            // Обновляем статус
+                                            statusTech.innerText = `Статус: Повтор #${repCount} (ампл. ${Math.round(amplitude)}°)`;
+                                        }
+                                        waitingForOpposite = false;
+                                        // Сброс для следующего цикла
+                                        minAngle = Infinity;
+                                        maxAngle = -Infinity;
+                                    }
+                                    // Обновляем минимум
+                                    if (current < minAngle) minAngle = current;
+                                }
+                                else if (isNearMax && lastExtreme !== 'max') {
+                                    // Достигли максимума
+                                    lastExtreme = 'max';
+                                    if (waitingForOpposite && maxAngle > -Infinity) {
+                                        // аналогично, но для обратного движения
+                                        const amplitude = maxAngle - minAngle;
+                                        if (amplitude > 20) {
+                                            repCount++;
+                                            amplitudeSum += amplitude;
+                                            if (amplitude > 45) qualityReps++;
+                                            repCounterOverlay.innerText = 'Повторов: ' + repCount;
+                                            statusTech.innerText = `Статус: Повтор #${repCount} (ампл. ${Math.round(amplitude)}°)`;
+                                        }
+                                        waitingForOpposite = false;
+                                        minAngle = Infinity;
+                                        maxAngle = -Infinity;
+                                    }
+                                    if (current > maxAngle) maxAngle = current;
+                                }
+
+                                // Если мы нашли и минимум, и максимум, готовимся к следующему повтору
+                                if (minAngle !== Infinity && maxAngle !== -Infinity) {
+                                    waitingForOpposite = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Ошибка при обработке кадра:", e);
+            }
+
+            requestAnimationFrame(detectTechnique);
+        }
+
+        // === ЗАГРУЗКА ВИДЕО ===
+        uploadTechBtn.onclick = () => techUploadInput.click();
+        techUploadInput.onchange = async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            statusTech.innerText = "Статус: Загружаем видео...";
+            if (!net) await initPose();
+            if (!net) { statusTech.innerText = "Ошибка: не удалось загрузить ИИ."; return; }
+
+            // Останавливаем предыдущий анализ
+            isAnalyzing = false;
+            resetCounters();
+
+            const url = URL.createObjectURL(file);
+            techVideo.src = url;
+            techVideo.srcObject = null;
+            techVideo.loop = false;
+            techVideo.muted = true;
+
+            techVideo.onloadedmetadata = function() {
+                techCanvas.width = techVideo.videoWidth || 640;
+                techCanvas.height = techVideo.videoHeight || 480;
+                seekTech.style.display = 'block';
+                playPauseTechBtn.style.display = 'block';
+                statusTech.innerText = "Статус: Анализируем видео...";
+                isAnalyzing = true;
+                detectTechnique();
+            };
+
+            techVideo.onended = function() {
+                isAnalyzing = false;
+                generateReport();
+            };
+
+            // Контролы воспроизведения
+            techVideo.addEventListener('timeupdate', () => {
+                if (techVideo.currentTime < 0.5) resetCounters(); // сброс при перемотке в начало
+                const progress = (techVideo.currentTime / techVideo.duration) * 100;
+                seekTech.value = progress;
+                seekTech.style.setProperty('--progress', progress + '%');
+            });
+            seekTech.addEventListener('input', () => {
+                techVideo.currentTime = (seekTech.value / 100) * techVideo.duration;
+            });
+            playPauseTechBtn.onclick = () => {
+                if (techVideo.paused) { techVideo.play(); playPauseTechBtn.innerText = "⏯ Пауза"; }
+                else { techVideo.pause(); playPauseTechBtn.innerText = "▶ Играть"; }
+            };
+
+            techVideo.play().catch(err => console.log("Автовоспроизведение заблокировано"));
+        };
+
+        // Ручное добавление повтора
+        manualRepBtn.onclick = function() {
+            repCount++;
+            amplitudeSum += 50; // условная амплитуда
+            repCounterOverlay.innerText = 'Повторов: ' + repCount;
+            statusTech.innerText = `Статус: Добавлен повтор вручную (#${repCount})`;
+        };
+
+        // Сброс
+        resetTechBtn.onclick = function() {
+            resetCounters();
+            statusTech.innerText = "Статус: Счёт сброшен. Продолжай анализ.";
+            if (techVideo.paused) {
+                // если видео на паузе, можно перезапустить анализ
+            }
+        };
+
+        // Инициализация модели при загрузке страницы
+        initPose();
+    })();
+</script>
 </body>
 </html>
