@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -209,25 +209,23 @@
         const seekTech = document.getElementById('seekTech');
         const playPauseTechBtn = document.getElementById('playPauseTech');
 
-        let net = null;
+        let detector = null;
         let techFrames = 0;
         let repCount = 0;
         let qualityReps = 0;
-        let isDown = false;
+        let downFlag = false;
+        let upFlag = false;
         let framesSinceRep = 0;
-        let smoothing = [];
-
-        // НАСТРОЙКА ПОРОГОВ (под жим сбоку)
-        const LOW_THRESHOLD = 100;
-        const HIGH_THRESHOLD = 130;
-        const QUALITY_LOW = 95;
-        const QUALITY_HIGH = 140;
+        let prevWristY = null;
+        let wristHistory = [];
 
         async function initPose() {
-            statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
+            statusTech.innerText = "Статус: Загружаем нейросеть (MoveNet)...";
             try {
                 await tf.ready();
-                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 1.0 });
+                // Загружаем MoveNet с тем же CDN, что и TensorFlow
+                const model = poseDetection.SupportedModels.MoveNet;
+                detector = await poseDetection.createDetector(model, { modelType: 'SinglePose.Lightning' });
                 statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -241,7 +239,7 @@
 
             report += "Повторений сделано: " + repCount + "\n";
             report += "Качественных повторений: " + qualityReps + "/" + repCount + "\n\n";
-            
+
             if (qualityReps > 0) {
                 score = 100;
             } else {
@@ -255,9 +253,11 @@
         function resetCounters() {
             repCount = 0;
             qualityReps = 0;
-            isDown = false;
+            downFlag = false;
+            upFlag = false;
             framesSinceRep = 0;
-            smoothing = [];
+            prevWristY = null;
+            wristHistory = [];
         }
 
         uploadTechBtn.onclick = () => techUploadInput.click();
@@ -265,7 +265,7 @@
             const file = e.target.files[0];
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
-                if (!net) { await initPose(); }
+                if (!detector) { await initPose(); }
 
                 techVideo.pause();
                 resetCounters();
@@ -331,69 +331,73 @@
             }
         }
 
+        // ЛОГИКА: отслеживаем положение запястья относительно бедра (вертикаль)
         async function detectTechnique() {
-            if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
+            if (techVideo.readyState < 2 || !detector) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
             if (techFrames % 2 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
-            const pose = await net.estimateSinglePose(techVideo);
-            if (pose && pose.keypoints) {
-                drawSkeleton(pose.keypoints);
+            const poses = await detector.estimatePoses(techVideo);
+            if (poses && poses.length > 0) {
+                const keypoints = poses[0].keypoints;
+                drawSkeleton(keypoints);
 
-                const lShoulder = pose.keypoints[5];
-                const lElbow = pose.keypoints[7];
-                const lWrist = pose.keypoints[9];
-                const rShoulder = pose.keypoints[6];
-                const rElbow = pose.keypoints[8];
-                const rWrist = pose.keypoints[10];
+                // Используем точки MoveNet: 11 = левое плечо, 23 = левое бедро, 9 = левое запястье
+                const leftShoulder = keypoints[11];
+                const leftHip = keypoints[23];
+                const leftWrist = keypoints[9];
+                const rightShoulder = keypoints[12];
+                const rightHip = keypoints[24];
+                const rightWrist = keypoints[10];
 
-                let bestAngle = null;
-                if (lShoulder && lElbow && lWrist) {
-                    let a = calculateAngle(lShoulder, lElbow, lWrist);
-                    if (a !== null && (bestAngle === null || lShoulder.score > 0.5)) {
-                        bestAngle = a;
-                    }
+                let wrist = null;
+                let hip = null;
+
+                if (leftWrist && leftHip && leftWrist.score > 0.4 && leftHip.score > 0.4) {
+                    wrist = leftWrist.position;
+                    hip = leftHip.position;
+                } else if (rightWrist && rightHip && rightWrist.score > 0.4 && rightHip.score > 0.4) {
+                    wrist = rightWrist.position;
+                    hip = rightHip.position;
                 }
-                if (rShoulder && rElbow && rWrist) {
-                    let a = calculateAngle(rShoulder, rElbow, rWrist);
-                    if (a !== null && (bestAngle === null || rShoulder.score > 0.5)) {
-                        bestAngle = a;
-                    }
-                }
 
-                if (bestAngle !== null) {
-                    // Мягкое сглаживание (3 кадра)
-                    smoothing.push(bestAngle);
-                    if (smoothing.length > 3) smoothing.shift();
-                    const smoothedAngle = smoothing.reduce((a,b) => a+b, 0) / smoothing.length;
+                if (wrist && hip) {
+                    // diffY: положительное = запястье ниже бедра, отрицательное = выше бедра
+                    const diffY = wrist.y - hip.y;
+                    
+                    // Сглаживание по 3 кадрам
+                    wristHistory.push(diffY);
+                    if (wristHistory.length > 3) wristHistory.shift();
+                    const smoothedDiff = wristHistory.reduce((a,b) => a+b, 0) / wristHistory.length;
 
                     if (framesSinceRep > 0) framesSinceRep--;
 
-                    if (smoothedAngle < LOW_THRESHOLD) {
-                        isDown = true;
+                    // Логика: если запястье опустилось ниже бедра (> 15) - флаг вниз
+                    // Если поднялось выше бедра (< -15) - флаг вверх
+                    if (smoothedDiff > 15) {
+                        downFlag = true;
                     }
-                    if (smoothedAngle > HIGH_THRESHOLD && isDown && framesSinceRep === 0) {
+                    if (smoothedDiff < -15) {
+                        upFlag = true;
+                    }
+
+                    // Повторение засчитывается: вниз был, потом вверх
+                    if (downFlag && upFlag && framesSinceRep === 0) {
                         repCount++;
                         
-                        if (smoothing.some(a => a < QUALITY_LOW) && smoothing.some(a => a > QUALITY_HIGH)) {
+                        // Качество: проверяем глубину хода (вниз и вверх)
+                        if (smoothedDiff > 30 || smoothedDiff < -30) {
                             qualityReps++;
                         }
                         
-                        isDown = false;
+                        downFlag = false;
+                        upFlag = false;
                         framesSinceRep = 10;
-                        smoothing = [];
+                        wristHistory = [];
                     }
                 }
             }
             requestAnimationFrame(detectTechnique);
-        }
-
-        function calculateAngle(a, b, c) {
-            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
-            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
         }
     </script>
 </body>
