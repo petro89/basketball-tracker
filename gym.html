@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Technique & Calculators</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -209,23 +209,22 @@
         const seekTech = document.getElementById('seekTech');
         const playPauseTechBtn = document.getElementById('playPauseTech');
 
-        let detector = null;
+        let net = null;
         let techFrames = 0;
         let repCount = 0;
         let qualityReps = 0;
-        let isExtended = false;
-        let isContracted = false;
+        let angleHistory = [];
+        let minAngle = 180;
+        let maxAngle = 0;
+        let lastValley = null;
+        let lastPeak = null;
         let framesSinceRep = 0;
-        let distHistory = [];
-        let minDist = 9999;
-        let maxDist = 0;
 
         async function initPose() {
-            statusTech.innerText = "Статус: Загружаем нейросеть (MoveNet)...";
+            statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                const model = poseDetection.SupportedModels.MoveNet;
-                detector = await poseDetection.createDetector(model, { modelType: 'SinglePose.Lightning' });
+                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 1.0 });
                 statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -253,12 +252,12 @@
         function resetCounters() {
             repCount = 0;
             qualityReps = 0;
-            isExtended = false;
-            isContracted = false;
+            angleHistory = [];
+            minAngle = 180;
+            maxAngle = 0;
+            lastValley = null;
+            lastPeak = null;
             framesSinceRep = 0;
-            distHistory = [];
-            minDist = 9999;
-            maxDist = 0;
         }
 
         uploadTechBtn.onclick = () => techUploadInput.click();
@@ -266,7 +265,7 @@
             const file = e.target.files[0];
             if (file) {
                 statusTech.innerText = "Статус: Загружаем видео...";
-                if (!detector) { await initPose(); }
+                if (!net) { await initPose(); }
 
                 techVideo.pause();
                 resetCounters();
@@ -332,75 +331,94 @@
             }
         }
 
-        // НОВАЯ ЛОГИКА: РАССТОЯНИЕ МЕЖДУ ЗАПЯСТЬЕМ И ПЛЕЧОМ
+        // АЛГОРИТМ ПОИСКА ПИКОВ (Peak Detection)
         async function detectTechnique() {
-            if (techVideo.readyState < 2 || !detector) { requestAnimationFrame(detectTechnique); return; }
+            if (techVideo.readyState < 2 || !net) { requestAnimationFrame(detectTechnique); return; }
             techFrames++;
-            if (techFrames % 2 !== 0) { requestAnimationFrame(detectTechnique); return; }
+            if (techFrames % 3 !== 0) { requestAnimationFrame(detectTechnique); return; }
 
-            const poses = await detector.estimatePoses(techVideo);
-            if (poses && poses.length > 0) {
-                const keypoints = poses[0].keypoints;
-                drawSkeleton(keypoints);
+            const pose = await net.estimateSinglePose(techVideo);
+            if (pose && pose.keypoints) {
+                drawSkeleton(pose.keypoints);
 
-                const leftShoulder = keypoints[11];
-                const leftWrist = keypoints[9];
-                const rightShoulder = keypoints[12];
-                const rightWrist = keypoints[10];
+                const lShoulder = pose.keypoints[5];
+                const lElbow = pose.keypoints[7];
+                const lWrist = pose.keypoints[9];
+                const rShoulder = pose.keypoints[6];
+                const rElbow = pose.keypoints[8];
+                const rWrist = pose.keypoints[10];
 
-                let dist = null;
-                if (leftShoulder && leftWrist && leftShoulder.score > 0.4 && leftWrist.score > 0.4) {
-                    const dx = leftWrist.position.x - leftShoulder.position.x;
-                    const dy = leftWrist.position.y - leftShoulder.position.y;
-                    dist = Math.sqrt(dx * dx + dy * dy);
-                } else if (rightShoulder && rightWrist && rightShoulder.score > 0.4 && rightWrist.score > 0.4) {
-                    const dx = rightWrist.position.x - rightShoulder.position.x;
-                    const dy = rightWrist.position.y - rightShoulder.position.y;
-                    dist = Math.sqrt(dx * dx + dy * dy);
+                let bestAngle = null;
+                if (lShoulder && lElbow && lWrist) {
+                    let a = calculateAngle(lShoulder, lElbow, lWrist);
+                    if (a !== null && (bestAngle === null || lShoulder.score > 0.5)) {
+                        bestAngle = a;
+                    }
+                }
+                if (rShoulder && rElbow && rWrist) {
+                    let a = calculateAngle(rShoulder, rElbow, rWrist);
+                    if (a !== null && (bestAngle === null || rShoulder.score > 0.5)) {
+                        bestAngle = a;
+                    }
                 }
 
-                if (dist !== null) {
-                    // Отладочная информация
-                    statusTech.innerText = "Статус: Расстояние = " + Math.round(dist) + " px. Повторений = " + repCount;
+                if (bestAngle !== null) {
+                    if (bestAngle > maxAngle) maxAngle = bestAngle;
+                    if (bestAngle < minAngle) minAngle = bestAngle;
 
-                    distHistory.push(dist);
-                    if (distHistory.length > 3) distHistory.shift();
-                    const smoothedDist = distHistory.reduce((a,b) => a+b, 0) / distHistory.length;
+                    // Сохраняем в историю сглаживание
+                    angleHistory.push(bestAngle);
+                    if (angleHistory.length > 5) angleHistory.shift();
 
-                    // Обновляем максимумы и минимумы
-                    if (smoothedDist > maxDist) maxDist = smoothedDist;
-                    if (smoothedDist < minDist) minDist = smoothedDist;
-
-                    if (framesSinceRep > 0) framesSinceRep--;
-
-                    // Логика: если расстояние стало большим (> 90% от maxDist) - рука выпрямлена (extended)
-                    // Если стало маленьким (< 60% от maxDist) - рука согнута (contracted)
-                    if (maxDist > 0 && smoothedDist > maxDist * 0.9) {
-                        isExtended = true;
-                    }
-                    if (minDist < 9999 && smoothedDist < maxDist * 0.6) {
-                        isContracted = true;
+                    // Определяем тренд (возрастает или убывает)
+                    let trend = 'flat';
+                    if (angleHistory.length >= 3) {
+                        const first = angleHistory[0];
+                        const last = angleHistory[angleHistory.length - 1];
+                        if (last < first - 2) trend = 'down';
+                        else if (last > first + 2) trend = 'up';
                     }
 
-                    // Повторение засчитывается, когда рука была выпрямлена, потом согнута, потом снова выпрямлена
-                    if (isExtended && isContracted && framesSinceRep === 0) {
+                    // Ищем локальную впадину (минимум) - рука согнута
+                    if (trend === 'up' && lastValley !== null) {
+                        const recentMin = Math.min(...angleHistory.slice(-3));
+                        if (angleHistory[angleHistory.length - 1] > recentMin + 5) {
+                            lastPeak = angleHistory[angleHistory.length - 1];
+                            lastValley = null;
+                        }
+                    }
+
+                    // Ищем локальный пик (максимум) - рука выпрямлена
+                    if (trend === 'down' && lastPeak !== null) {
+                        const recentMax = Math.max(...angleHistory.slice(-3));
+                        if (angleHistory[angleHistory.length - 1] < recentMax - 5) {
+                            lastValley = angleHistory[angleHistory.length - 1];
+                            lastPeak = null;
+                        }
+                    }
+
+                    // Если после пика последовала впадина и снова пик - повторение
+                    if (lastValley !== null && lastPeak === null && trend === 'up' && angleHistory[angleHistory.length - 1] > lastValley + 20) {
                         repCount++;
-
-                        // Качество: проверяем, была ли амплитуда большой (значительное изменение расстояния)
-                        if (maxDist - minDist > 100) {
+                        // Качество: впадина глубокая (угол маленький) и пик высокий (угол большой)
+                        if (lastValley < 120 && maxAngle > 150) {
                             qualityReps++;
                         }
-
-                        isExtended = false;
-                        isContracted = false;
+                        lastValley = null;
+                        angleHistory = [];
                         framesSinceRep = 10;
-                        distHistory = [];
-                        minDist = 9999;
-                        maxDist = 0;
                     }
                 }
             }
             requestAnimationFrame(detectTechnique);
+        }
+
+        function calculateAngle(a, b, c) {
+            if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
+            const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) - Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360 - angle;
+            return angle;
         }
     </script>
 </body>
