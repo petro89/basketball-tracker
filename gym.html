@@ -241,6 +241,7 @@
         // Счётчик повторений на основе подтверждённых локальных экстремумов угла.
         let angleHistory = [];
         let recentAngles = [];
+        let extremaSequence = [];
         let lastExtreme = null;
         let amplitudeSum = 0;
         let qualityReps = 0;
@@ -264,6 +265,7 @@
             angleHistory = [];
             recentAngles = [];
             lastExtreme = null;
+            extremaSequence = [];
             amplitudeSum = 0;
             qualityReps = 0;
             lastCountTime = -Infinity;
@@ -328,7 +330,6 @@
             if (recentAngles.length > 5) recentAngles.shift();
             if (recentAngles.length < 5) return;
 
-            // Проверяем центральный кадр: он должен быть локальным максимумом или минимумом.
             const a = recentAngles[0].angle, b = recentAngles[1].angle, c = recentAngles[2].angle;
             const d = recentAngles[3].angle, e = recentAngles[4].angle;
             let extreme = null;
@@ -336,37 +337,39 @@
             else if (c <= a && c <= b && c <= d && c <= e) extreme = { type: 'min', angle: c, time: recentAngles[2].time };
             if (!extreme) return;
 
-            // Игнорируем шумовые пики и повторное обнаружение одного и того же пика.
+            // Suppress repeated detections of the same plateau.
             if (lastExtreme && lastExtreme.type === extreme.type) {
-                if (extreme.type === 'max' && extreme.angle > lastExtreme.angle) lastExtreme = extreme;
-                if (extreme.type === 'min' && extreme.angle < lastExtreme.angle) lastExtreme = extreme;
+                if ((extreme.type === 'max' && extreme.angle > lastExtreme.angle) ||
+                    (extreme.type === 'min' && extreme.angle < lastExtreme.angle)) {
+                    lastExtreme = extreme;
+                    if (extremaSequence.length) extremaSequence[extremaSequence.length - 1] = extreme;
+                }
                 return;
             }
-            if (lastExtreme) {
-                const amplitude = Math.abs(extreme.angle - lastExtreme.angle);
-                if (amplitude >= 18) {
-                    // Полный повтор фиксируется при возвращении к тому же краю диапазона.
-                    if (lastExtreme.previousSameTypeAngle !== undefined &&
-                        Math.abs(extreme.angle - lastExtreme.previousSameTypeAngle) <= 35 &&
-                        extreme.time - lastCountTime > 0.45) {
-                        repCount++;
-                        amplitudeSum += amplitude;
-                        if (amplitude > 45) qualityReps++;
-                        lastCountTime = extreme.time;
-                        repCounterOverlay.innerText = 'Повторов: ' + repCount;
-                        statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
-                    }
-                    const priorSame = lastExtreme.sameTypeAngle;
-                    extreme.previousSameTypeAngle = priorSame;
-                    extreme.sameTypeAngle = extreme.angle;
+            if (lastExtreme && Math.abs(extreme.angle - lastExtreme.angle) < 18) return;
+
+            extremaSequence.push(extreme);
+            if (extremaSequence.length > 3) extremaSequence.shift();
+
+            // A full repetition is min→max→min or max→min→max.
+            if (extremaSequence.length === 3) {
+                const first = extremaSequence[0], middle = extremaSequence[1], last = extremaSequence[2];
+                const amplitude = Math.abs(middle.angle - last.angle);
+                const returnsToStart = first.type === last.type;
+                const returnTolerance = Math.max(25, Math.abs(first.angle - middle.angle) * 0.45);
+                if (returnsToStart &&
+                    Math.abs(last.angle - first.angle) <= returnTolerance &&
+                    amplitude >= 18 &&
+                    last.time - lastCountTime > 0.45) {
+                    repCount++;
+                    amplitudeSum += amplitude;
+                    if (amplitude > 45) qualityReps++;
+                    lastCountTime = last.time;
+                    repCounterOverlay.innerText = 'Повторов: ' + repCount;
+                    statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
+                    // Keep the last extreme as the start of the next cycle.
+                    extremaSequence = [middle, last];
                 }
-            } else {
-                extreme.sameTypeAngle = extreme.angle;
-            }
-            // Храним крайние точки одного типа для распознавания возвращения.
-            if (lastExtreme && lastExtreme.type === extreme.type) return;
-            if (lastExtreme && lastExtreme.sameTypeAngle !== undefined) {
-                extreme.previousSameTypeAngle = lastExtreme.previousSameTypeAngle;
             }
             lastExtreme = extreme;
         }
