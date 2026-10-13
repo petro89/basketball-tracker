@@ -354,10 +354,19 @@
                     const rWrist = pose.keypoints[10];
 
                     let bestAngle = null;
-                    if (lShoulder && lElbow && lWrist && lShoulder.score > 0.5) {
+                    // Используем только руку, у которой уверенно распознаны все три сустава.
+                    // Это уменьшает скачки угла из-за случайных/невидимых ключевых точек.
+                    const minJointConfidence = 0.45;
+                    if (lShoulder && lElbow && lWrist &&
+                        lShoulder.score >= minJointConfidence &&
+                        lElbow.score >= minJointConfidence &&
+                        lWrist.score >= minJointConfidence) {
                         bestAngle = calculateAngle(lShoulder, lElbow, lWrist);
                     }
-                    if (rShoulder && rElbow && rWrist && rShoulder.score > 0.5) {
+                    if (rShoulder && rElbow && rWrist &&
+                        rShoulder.score >= minJointConfidence &&
+                        rElbow.score >= minJointConfidence &&
+                        rWrist.score >= minJointConfidence) {
                         const a = calculateAngle(rShoulder, rElbow, rWrist);
                         if (a !== null && (bestAngle === null || a > bestAngle)) bestAngle = a;
                     }
