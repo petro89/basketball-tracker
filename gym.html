@@ -249,7 +249,7 @@
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем ИИ-модель (MediaPipe)...";
             try {
-                const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm");
+                const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs");
                 const fileset = await vision.FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
                 );
