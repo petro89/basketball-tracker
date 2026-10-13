@@ -222,6 +222,11 @@
         const techVideo = document.getElementById('techFeed');
         const techCanvas = document.getElementById('techCanvas');
         const techCtx = techCanvas.getContext('2d');
+        // Небольшой отдельный кадр для ИИ снижает нагрузку на мобильные устройства.
+        const poseFrameCanvas = document.createElement('canvas');
+        const poseFrameCtx = poseFrameCanvas.getContext('2d', { alpha: false });
+        let lastInferenceAt = 0;
+        let consecutiveFrameErrors = 0;
         const uploadTechBtn = document.getElementById('uploadTechBtn');
         const techUploadInput = document.getElementById('techUpload');
         const statusTech = document.getElementById('aiStatusTech');
@@ -446,8 +451,28 @@
                 return;
             }
 
+            // Не запускаем ИИ чаще 10 раз в секунду: detectForVideo синхронный
+            // и может блокировать главный поток на телефонах.
+            const now = performance.now();
+            if (now - lastInferenceAt < 100) {
+                requestAnimationFrame(detectTechnique);
+                return;
+            }
+            lastInferenceAt = now;
+
             try {
-                const result = net.detectForVideo(techVideo, performance.now());
+                const sourceW = techVideo.videoWidth || 640;
+                const sourceH = techVideo.videoHeight || 480;
+                const scale = Math.min(1, 640 / sourceW);
+                const frameW = Math.max(1, Math.round(sourceW * scale));
+                const frameH = Math.max(1, Math.round(sourceH * scale));
+                if (poseFrameCanvas.width !== frameW || poseFrameCanvas.height !== frameH) {
+                    poseFrameCanvas.width = frameW;
+                    poseFrameCanvas.height = frameH;
+                }
+                poseFrameCtx.drawImage(techVideo, 0, 0, frameW, frameH);
+                const result = net.detectForVideo(poseFrameCanvas, now);
+                consecutiveFrameErrors = 0;
                 const landmarks = result && result.landmarks && result.landmarks[0];
                 if (landmarks && landmarks.length >= 29) {
                     const keypoints = landmarks.map((point, index) => ({
@@ -468,7 +493,15 @@
                 }
             } catch (e) {
                 console.warn('Ошибка при обработке кадра:', e);
-                statusTech.innerText = "Ошибка анализа кадра: " + e.message;
+                consecutiveFrameErrors++;
+                statusTech.innerText = "Ошибка анализа кадра: " + (e && e.message ? e.message : "неизвестная ошибка");
+                // Не даём повторяющейся ошибке создать бесконечный цикл и подвесить страницу.
+                if (consecutiveFrameErrors >= 3) {
+                    isAnalyzing = false;
+                    techVideo.pause();
+                    statusTech.innerText += "\nАнализ остановлен для защиты страницы. Попробуй видео 720p/30fps или более короткий ролик.";
+                    return;
+                }
             }
             if (isAnalyzing && !techVideo.paused && !techVideo.ended) requestAnimationFrame(detectTechnique);
         }
