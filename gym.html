@@ -249,7 +249,7 @@
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем ИИ-модель (MediaPipe)...";
             try {
-                const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs");
+                const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs").catch(async (firstError) => { console.warn("jsDelivr failed, trying unpkg", firstError); return await import("https://unpkg.com/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs"); });
                 const fileset = await vision.FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
                 );
