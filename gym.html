@@ -494,14 +494,13 @@
             } catch (e) {
                 console.warn('Ошибка при обработке кадра:', e);
                 consecutiveFrameErrors++;
-                statusTech.innerText = "Ошибка анализа кадра: " + (e && e.message ? e.message : "неизвестная ошибка");
-                // Не даём повторяющейся ошибке создать бесконечный цикл и подвесить страницу.
-                if (consecutiveFrameErrors >= 3) {
-                    isAnalyzing = false;
-                    techVideo.pause();
-                    statusTech.innerText += "\nАнализ остановлен для защиты страницы. Попробуй видео 720p/30fps или более короткий ролик.";
-                    return;
-                }
+                // Сразу останавливаем обработку при первой ошибке: не продолжаем
+                // вызывать detectForVideo на проблемном кадре и не рискуем подвесить страницу.
+                isAnalyzing = false;
+                techVideo.pause();
+                statusTech.innerText = "Ошибка анализа кадра: " + (e && e.message ? e.message : "неизвестная ошибка") +
+                    "\nАнализ безопасно остановлен. Попробуй пересохранить видео в MP4 (H.264), 720p и 30 кадров/с.";
+                return;
             }
             if (isAnalyzing && !techVideo.paused && !techVideo.ended) requestAnimationFrame(detectTechnique);
         }
