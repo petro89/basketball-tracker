@@ -100,7 +100,7 @@
 
     <button id="playPauseTech" class="pause-btn" style="display: none;">⏯ Пауза</button>
     <input type="range" id="seekTech" class="custom-range" min="0" max="100" value="0" style="display: none;">
-    <input type="file" id="techUpload" accept="video/*" style="display: none;">
+    <input type="file" id="techUpload" accept="video/*,.mp4,.mov,.webm,.m4v" style="position:fixed;left:-10000px;top:0;width:1px;height:1px;opacity:0;">
 
     <div class="input-group">
         <label>Выбери упражнение</label>
@@ -441,10 +441,20 @@
         }
 
         // === ЗАГРУЗКА ВИДЕО ===
-        uploadTechBtn.onclick = () => techUploadInput.click();
+        uploadTechBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            // Invoke the picker synchronously within the user's click for mobile browsers.
+            try {
+                if (typeof techUploadInput.showPicker === 'function') techUploadInput.showPicker();
+                else techUploadInput.click();
+            } catch (err) {
+                techUploadInput.click();
+            }
+        });
         techUploadInput.onchange = async function(e) {
-            const file = e.target.files[0];
+            const file = e.target.files && e.target.files[0];
             if (!file) return;
+            statusTech.innerText = 'Выбрано видео: ' + file.name + '\nПодготавливаю анализ...';
 
             statusTech.innerText = "Статус: Загружаем видео...";
             if (!net) await initPose();
