@@ -438,8 +438,10 @@
                     lastCountTime = last.time;
                     repCounterOverlay.innerText = 'Повторов: ' + repCount;
                     statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
-                    // Keep the last extreme as the start of the next cycle.
-                    extremaSequence = [middle, last];
+                    // Start a fresh cycle from the completed return point.
+                    // Keeping [middle, last] overlaps adjacent half-cycles and double-counts
+                    // one physical repetition as two reps (press + return).
+                    extremaSequence = [last];
                 }
             }
             lastExtreme = extreme;
