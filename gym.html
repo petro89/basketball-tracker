@@ -286,7 +286,7 @@
                     minTrackingConfidence: 0.45,
                     outputSegmentationMasks: false
                 };
-                const modelUrl = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
+                const modelUrl = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
                 // GPU может быть недоступен в мобильном браузере/встроенном окне.
                 try {
                     net = await vision.PoseLandmarker.createFromOptions(fileset, {
@@ -463,17 +463,9 @@
             lastInferenceAt = now;
 
             try {
-                const sourceW = techVideo.videoWidth || 640;
-                const sourceH = techVideo.videoHeight || 480;
-                const scale = Math.min(1, 640 / sourceW);
-                const frameW = Math.max(1, Math.round(sourceW * scale));
-                const frameH = Math.max(1, Math.round(sourceH * scale));
-                if (poseFrameCanvas.width !== frameW || poseFrameCanvas.height !== frameH) {
-                    poseFrameCanvas.width = frameW;
-                    poseFrameCanvas.height = frameH;
-                }
-                poseFrameCtx.drawImage(techVideo, 0, 0, frameW, frameH);
-                const result = net.detectForVideo(poseFrameCanvas, now);
+                // Feed the decoded video element directly; this path was verified
+                // on the user's phone. Use the Lite model to reduce inference cost.
+                const result = net.detectForVideo(techVideo, now);
                 consecutiveFrameErrors = 0;
                 const landmarks = result && result.landmarks && result.landmarks[0];
                 if (landmarks && landmarks.length >= 29) {
@@ -530,6 +522,8 @@
 
             // Останавливаем предыдущий анализ
             isAnalyzing = false;
+            lastInferenceAt = 0;
+            consecutiveFrameErrors = 0;
             resetCounters();
 
             const url = URL.createObjectURL(file);
