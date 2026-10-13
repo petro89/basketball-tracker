@@ -378,10 +378,12 @@
             const reachedAngle = candidateExtreme.angle;
             if (reachedType) {
                 const previousSameType = lastExtremeByType[reachedType];
-                if (previousSameType !== null) {
-                    const amplitude = Math.abs(reachedAngle - previousSameType);
-                    // Повтор засчитывается, когда после полного движения снова достигнута
-                    // крайняя точка того же типа (min→max→min или max→min→max).
+                const oppositeType = reachedType === 'min' ? 'max' : 'min';
+                const oppositeAngle = lastExtremeByType[oppositeType];
+                if (previousSameType !== null && oppositeAngle !== null) {
+                    const amplitude = Math.abs(reachedAngle - oppositeAngle);
+                    // Повтор засчитывается при возвращении к крайней точке того же типа
+                    // после противоположного экстремума (min→max→min или max→min→max).
                     if (amplitude >= 25) {
                         repCount++;
                         amplitudeSum += amplitude;
