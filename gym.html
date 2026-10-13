@@ -455,10 +455,10 @@
                 return;
             }
 
-            // Не запускаем ИИ чаще 10 раз в секунду: detectForVideo синхронный
-            // и может блокировать главный поток на телефонах.
+            // Умеренно повышаем частоту до ~14 кадров/с, чтобы скелет меньше отставал,
+            // не перегружая мобильный браузер так сильно, как при анализе каждого кадра.
             const now = performance.now();
-            if (now - lastInferenceAt < 100) {
+            if (now - lastInferenceAt < 70) {
                 requestAnimationFrame(detectTechnique);
                 return;
             }
