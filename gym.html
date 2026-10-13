@@ -430,9 +430,13 @@
                 const amplitude = Math.abs(middle.angle - last.angle);
                 const returnsToStart = first.type === last.type;
                 const returnTolerance = Math.max(25, Math.abs(first.angle - middle.angle) * 0.45);
+                // Не засчитываем мелкие колебания позы в ожидании подхода:
+                // нужен заметный ход угла и реалистичная длительность полного цикла.
+                const cycleDuration = last.time - first.time;
                 if (returnsToStart &&
                     Math.abs(last.angle - first.angle) <= returnTolerance &&
-                    amplitude >= 10 &&
+                    amplitude >= 20 &&
+                    cycleDuration >= 0.7 &&
                     last.time - lastCountTime > 0.45) {
                     repCount++;
                     amplitudeSum += amplitude;
