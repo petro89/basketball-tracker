@@ -245,7 +245,7 @@
         let smoothedAngle = null;
         let movementDirection = 0; // -1 угол уменьшается, 1 увеличивается
         let candidateExtreme = null;
-        let lastCompletedExtreme = null;
+        let lastExtremeByType = { min: null, max: null };
         let minAngle = Infinity;
         let maxAngle = -Infinity;
         let amplitudeSum = 0;
@@ -276,7 +276,7 @@
             smoothedAngle = null;
             movementDirection = 0;
             candidateExtreme = null;
-            lastCompletedExtreme = null;
+            lastExtremeByType = { min: null, max: null };
             minAngle = Infinity;
             maxAngle = -Infinity;
             amplitudeSum = 0;
@@ -376,18 +376,22 @@
 
             const reachedType = candidateExtreme.type;
             const reachedAngle = candidateExtreme.angle;
-            if (reachedType && lastCompletedExtreme && reachedType === lastCompletedExtreme.type) {
-                const amplitude = Math.abs(reachedAngle - lastCompletedExtreme.angle);
-                // Считаем только завершённый полный цикл между однотипными крайними точками.
-                if (amplitude >= 25) {
-                    repCount++;
-                    amplitudeSum += amplitude;
-                    if (amplitude > 45) qualityReps++;
-                    repCounterOverlay.innerText = 'Повторов: ' + repCount;
-                    statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
+            if (reachedType) {
+                const previousSameType = lastExtremeByType[reachedType];
+                if (previousSameType !== null) {
+                    const amplitude = Math.abs(reachedAngle - previousSameType);
+                    // Повтор засчитывается, когда после полного движения снова достигнута
+                    // крайняя точка того же типа (min→max→min или max→min→max).
+                    if (amplitude >= 25) {
+                        repCount++;
+                        amplitudeSum += amplitude;
+                        if (amplitude > 45) qualityReps++;
+                        repCounterOverlay.innerText = 'Повторов: ' + repCount;
+                        statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
+                    }
                 }
+                lastExtremeByType[reachedType] = reachedAngle;
             }
-            if (reachedType) lastCompletedExtreme = { type: reachedType, angle: reachedAngle };
 
             movementDirection = nextDirection;
             candidateExtreme = {
