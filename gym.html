@@ -330,7 +330,8 @@
             if (repCount > 0) {
                 const avgAmplitude = amplitudeSum / repCount;
                 report += 'Средняя амплитуда: ' + Math.round(avgAmplitude) + '°\\n';
-                report += 'Качество: ' + (avgAmplitude > 45 ? '✅ Отлично' : (avgAmplitude > 30 ? '⚠️ Средне' : '❌ Малая амплитуда'));
+                report += 'Повторов с хорошей амплитудой: ' + qualityReps + ' из ' + repCount + '\\n';
+                report += 'Качество: ' + (avgAmplitude > 45 ? '✅ Отлично' : (avgAmplitude > 30 ? '⚠️ Средне — часть повторений могла быть неполной' : '❌ Малая амплитуда'));
             } else {
                 report += 'Не удалось распознать полный цикл. Проверь, что выбрано правильное упражнение и нужные суставы видны в кадре.';
             }
