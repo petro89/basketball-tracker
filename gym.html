@@ -417,7 +417,8 @@
                 }
                 return;
             }
-            if (lastExtreme && Math.abs(extreme.angle - lastExtreme.angle) < 18) return;
+            // Ignore tiny pose jitter, but keep shorter/less-perfect reps countable.
+            if (lastExtreme && Math.abs(extreme.angle - lastExtreme.angle) < 10) return;
 
             extremaSequence.push(extreme);
             if (extremaSequence.length > 3) extremaSequence.shift();
@@ -430,7 +431,7 @@
                 const returnTolerance = Math.max(25, Math.abs(first.angle - middle.angle) * 0.45);
                 if (returnsToStart &&
                     Math.abs(last.angle - first.angle) <= returnTolerance &&
-                    amplitude >= 18 &&
+                    amplitude >= 10 &&
                     last.time - lastCountTime > 0.45) {
                     repCount++;
                     amplitudeSum += amplitude;
