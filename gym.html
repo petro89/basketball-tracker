@@ -238,30 +238,19 @@
         let repCount = 0;
         let currentAngle = 0;
 
-        // Устойчивый счётчик повторений: сглаживание угла + подтверждение смены направления.
-        // Предыдущая версия искала экстремумы в коротком окне и содержала дублирующий блок
-        // подсчёта, из-за чего повторения часто терялись или считались нестабильно.
+        // Счётчик повторений на основе подтверждённых локальных экстремумов угла.
         let angleHistory = [];
-        let smoothedAngle = null;
-        let movementDirection = 0; // -1 угол уменьшается, 1 увеличивается
-        let candidateExtreme = null;
-        let lastExtremeByType = { min: null, max: null };
-        let minAngle = Infinity;
-        let maxAngle = -Infinity;
+        let recentAngles = [];
+        let lastExtreme = null;
         let amplitudeSum = 0;
         let qualityReps = 0;
-        let extremeHold = 0;
+        let lastCountTime = -Infinity;
 
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                net = await posenet.load({
-                    architecture: 'MobileNetV1',
-                    outputStride: 16,
-                    inputResolution: 257,
-                    multiplier: 1.0
-                });
+                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 1.0 });
                 statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -273,15 +262,11 @@
             repCount = 0;
             currentAngle = 0;
             angleHistory = [];
-            smoothedAngle = null;
-            movementDirection = 0;
-            candidateExtreme = null;
-            lastExtremeByType = { min: null, max: null };
-            minAngle = Infinity;
-            maxAngle = -Infinity;
+            recentAngles = [];
+            lastExtreme = null;
             amplitudeSum = 0;
             qualityReps = 0;
-            extremeHold = 0;
+            lastCountTime = -Infinity;
             repCounterOverlay.innerText = 'Повторов: 0';
             angleDisplay.innerText = '0°';
         }
@@ -292,10 +277,9 @@
             if (repCount > 0) {
                 const avgAmplitude = amplitudeSum / repCount;
                 report += 'Средняя амплитуда: ' + Math.round(avgAmplitude) + '°\\n';
-                const quality = avgAmplitude > 45 ? '✅ Отлично' : (avgAmplitude > 30 ? '⚠️ Средне' : '❌ Малая амплитуда');
-                report += 'Качество: ' + quality;
+                report += 'Качество: ' + (avgAmplitude > 45 ? '✅ Отлично' : (avgAmplitude > 30 ? '⚠️ Средне' : '❌ Малая амплитуда'));
             } else {
-                report += 'Повторений не зафиксировано. Проверь, чтобы рука/сустав были видны сбоку и целиком.';
+                report += 'Угол руки не дал распознать цикл. Попробуй снять сбоку, чтобы плечо, локоть и кисть были видны.';
             }
             statusTech.innerText = 'Статус: Анализ завершён!\\n' + report;
         }
@@ -309,7 +293,7 @@
             techCtx.beginPath();
             connections.forEach(([a,b]) => {
                 const ka = keypoints[a], kb = keypoints[b];
-                if (ka && kb && ka.score > 0.2 && kb.score > 0.2) {
+                if (ka && kb && ka.position && kb.position && ka.score > 0.15 && kb.score > 0.15) {
                     techCtx.moveTo(ka.position.x, ka.position.y);
                     techCtx.lineTo(kb.position.x, kb.position.y);
                 }
@@ -317,7 +301,7 @@
             techCtx.stroke();
             techCtx.fillStyle = '#ff9500';
             keypoints.forEach(k => {
-                if (k && k.position && k.score > 0.2) {
+                if (k && k.position && k.score > 0.15) {
                     techCtx.beginPath();
                     techCtx.arc(k.position.x, k.position.y, 4, 0, 2 * Math.PI);
                     techCtx.fill();
@@ -327,7 +311,7 @@
 
         function calculateAngle(a, b, c) {
             if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
-            if (a.score < 0.2 || b.score < 0.2 || c.score < 0.2) return null;
+            if (a.score < 0.15 || b.score < 0.15 || c.score < 0.15) return null;
             const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) -
                             Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
             let angle = Math.abs(radians * 180 / Math.PI);
@@ -338,69 +322,53 @@
         function registerAngleSample(angle) {
             angleHistory.push(angle);
             if (angleHistory.length > 5) angleHistory.shift();
-            smoothedAngle = angleHistory.reduce((sum, value) => sum + value, 0) / angleHistory.length;
-            angleDisplay.innerText = Math.round(smoothedAngle) + '°';
+            const smoothed = angleHistory.reduce((sum, value) => sum + value, 0) / angleHistory.length;
+            angleDisplay.innerText = Math.round(smoothed) + '°';
+            recentAngles.push({ angle: smoothed, time: techVideo.currentTime });
+            if (recentAngles.length > 5) recentAngles.shift();
+            if (recentAngles.length < 5) return;
 
-            if (candidateExtreme === null) {
-                candidateExtreme = { angle: smoothedAngle, type: null };
+            // Проверяем центральный кадр: он должен быть локальным максимумом или минимумом.
+            const a = recentAngles[0].angle, b = recentAngles[1].angle, c = recentAngles[2].angle;
+            const d = recentAngles[3].angle, e = recentAngles[4].angle;
+            let extreme = null;
+            if (c >= a && c >= b && c >= d && c >= e) extreme = { type: 'max', angle: c, time: recentAngles[2].time };
+            else if (c <= a && c <= b && c <= d && c <= e) extreme = { type: 'min', angle: c, time: recentAngles[2].time };
+            if (!extreme) return;
+
+            // Игнорируем шумовые пики и повторное обнаружение одного и того же пика.
+            if (lastExtreme && lastExtreme.type === extreme.type) {
+                if (extreme.type === 'max' && extreme.angle > lastExtreme.angle) lastExtreme = extreme;
+                if (extreme.type === 'min' && extreme.angle < lastExtreme.angle) lastExtreme = extreme;
                 return;
             }
-
-            const delta = smoothedAngle - candidateExtreme.angle;
-            const nextDirection = Math.abs(delta) >= 2.5 ? (delta > 0 ? 1 : -1) : movementDirection;
-
-            if (movementDirection === 0) {
-                if (nextDirection !== 0) movementDirection = nextDirection;
-                candidateExtreme.angle = smoothedAngle;
-                return;
-            }
-
-            // Обновляем экстремум, пока движение идёт в прежнем направлении.
-            if (nextDirection === movementDirection || nextDirection === 0) {
-                if (movementDirection > 0) {
-                    candidateExtreme.angle = Math.max(candidateExtreme.angle, smoothedAngle);
-                    candidateExtreme.type = 'max';
-                } else {
-                    candidateExtreme.angle = Math.min(candidateExtreme.angle, smoothedAngle);
-                    candidateExtreme.type = 'min';
-                }
-                extremeHold = 0;
-                return;
-            }
-
-            // Смена направления считается настоящей только после заметного отката от пика.
-            const reversal = Math.abs(smoothedAngle - candidateExtreme.angle);
-            if (reversal < 7) return;
-            extremeHold++;
-            if (extremeHold < 2) return;
-
-            const reachedType = candidateExtreme.type;
-            const reachedAngle = candidateExtreme.angle;
-            if (reachedType) {
-                const previousSameType = lastExtremeByType[reachedType];
-                const oppositeType = reachedType === 'min' ? 'max' : 'min';
-                const oppositeAngle = lastExtremeByType[oppositeType];
-                if (previousSameType !== null && oppositeAngle !== null) {
-                    const amplitude = Math.abs(reachedAngle - oppositeAngle);
-                    // Повтор засчитывается при возвращении к крайней точке того же типа
-                    // после противоположного экстремума (min→max→min или max→min→max).
-                    if (amplitude >= 25) {
+            if (lastExtreme) {
+                const amplitude = Math.abs(extreme.angle - lastExtreme.angle);
+                if (amplitude >= 18) {
+                    // Полный повтор фиксируется при возвращении к тому же краю диапазона.
+                    if (lastExtreme.previousSameTypeAngle !== undefined &&
+                        Math.abs(extreme.angle - lastExtreme.previousSameTypeAngle) <= 35 &&
+                        extreme.time - lastCountTime > 0.45) {
                         repCount++;
                         amplitudeSum += amplitude;
                         if (amplitude > 45) qualityReps++;
+                        lastCountTime = extreme.time;
                         repCounterOverlay.innerText = 'Повторов: ' + repCount;
                         statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
                     }
+                    const priorSame = lastExtreme.sameTypeAngle;
+                    extreme.previousSameTypeAngle = priorSame;
+                    extreme.sameTypeAngle = extreme.angle;
                 }
-                lastExtremeByType[reachedType] = reachedAngle;
+            } else {
+                extreme.sameTypeAngle = extreme.angle;
             }
-
-            movementDirection = nextDirection;
-            candidateExtreme = {
-                angle: smoothedAngle,
-                type: movementDirection > 0 ? 'max' : 'min'
-            };
-            extremeHold = 0;
+            // Храним крайние точки одного типа для распознавания возвращения.
+            if (lastExtreme && lastExtreme.type === extreme.type) return;
+            if (lastExtreme && lastExtreme.sameTypeAngle !== undefined) {
+                extreme.previousSameTypeAngle = lastExtreme.previousSameTypeAngle;
+            }
+            lastExtreme = extreme;
         }
 
         async function detectTechnique() {
