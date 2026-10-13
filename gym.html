@@ -247,28 +247,41 @@
         let lastCountTime = -Infinity;
 
         async function initPose() {
-            statusTech.innerText = "Статус: Загружаем MediaPipe Pose Landmarker...";
+            statusTech.innerText = "Статус: Загружаем ИИ-модель (MediaPipe)...";
             try {
-                const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22");
+                const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm");
                 const fileset = await vision.FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
                 );
-                net = await vision.PoseLandmarker.createFromOptions(fileset, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
-                        delegate: "GPU"
-                    },
+                const commonOptions = {
                     runningMode: "VIDEO",
                     numPoses: 1,
                     minPoseDetectionConfidence: 0.45,
                     minPosePresenceConfidence: 0.45,
                     minTrackingConfidence: 0.45,
                     outputSegmentationMasks: false
-                });
-                statusTech.innerText = "Статус: MediaPipe загружен! Выбери упражнение и загрузи видео.";
+                };
+                const modelUrl = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
+                // GPU может быть недоступен в мобильном браузере/встроенном окне.
+                try {
+                    net = await vision.PoseLandmarker.createFromOptions(fileset, {
+                        ...commonOptions,
+                        baseOptions: { modelAssetPath: modelUrl, delegate: "GPU" }
+                    });
+                } catch (gpuError) {
+                    console.warn("MediaPipe GPU недоступен, пробуем CPU:", gpuError);
+                    net = await vision.PoseLandmarker.createFromOptions(fileset, {
+                        ...commonOptions,
+                        baseOptions: { modelAssetPath: modelUrl, delegate: "CPU" }
+                    });
+                }
+                statusTech.innerText = "Статус: ИИ загружен! Выбери упражнение и загрузи видео.";
+                return true;
             } catch (error) {
-                statusTech.innerText = "Ошибка загрузки MediaPipe: " + error.message + "\nПроверь интернет и обнови страницу.";
-                console.error(error);
+                net = null;
+                statusTech.innerText = "Не удалось загрузить ИИ: " + (error && error.message ? error.message : String(error)) + "\\nПроверь интернет или открой страницу в обычном Chrome.";
+                console.error("MediaPipe initialization failed:", error);
+                return false;
             }
         }
 
@@ -458,7 +471,7 @@
 
             statusTech.innerText = "Статус: Загружаем видео...";
             if (!net) await initPose();
-            if (!net) { statusTech.innerText = "Ошибка: не удалось загрузить ИИ."; return; }
+            if (!net) { if (!statusTech.innerText.includes("Не удалось загрузить ИИ")) statusTech.innerText = "Ошибка: ИИ не загрузился. Попробуй обновить страницу и открыть её в Chrome."; return; }
 
             // Останавливаем предыдущий анализ
             isAnalyzing = false;
