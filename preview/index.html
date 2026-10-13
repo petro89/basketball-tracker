@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Basketball Tracker Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Unbounded', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        body { min-height: 100vh; background: radial-gradient(circle at center, #2a2a40 0%, #06060e 70%); display: flex; justify-content: center; align-items: center; color: white; padding: 20px; overflow-x: hidden; }
+        .card { position: relative; background: linear-gradient(145deg, rgba(30, 30, 45, 0.95), rgba(15, 15, 25, 0.98)); border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 36px; padding: 25px 20px; max-width: 580px; width: 100%; text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 2px 0 rgba(255,255,255,0.2); margin-bottom: 20px; }
+        .nav-link { display: block; background: linear-gradient(135deg, #a855f7, #7c3aed); color: white; text-decoration: none; padding: 12px; border-radius: 18px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 5px 15px rgba(168, 85, 247, 0.4); }
+        h1 { font-size: 26px; font-weight: 800; background: linear-gradient(90deg, #ff9500, #ffd000, #ff5e00, #ff9500); background-size: 300% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shine 5s linear infinite; margin-bottom: 8px; }
+        @keyframes shine { to { background-position: 300% center; } }
+        .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 12px; margin-bottom: 20px; }
+        .tabs { display: flex; background: rgba(0, 0, 0, 0.4); border-radius: 50px; padding: 5px; margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .tab-btn { flex: 1; padding: 12px; font-size: 12px; font-weight: 600; border: none; background: transparent; color: rgba(255, 255, 255, 0.6); cursor: pointer; border-radius: 40px; }
+        .tab-btn.active { background: linear-gradient(135deg, #ff9500, #ff5e00); color: white; box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4); }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        .video-container { width: 100%; height: 280px; border-radius: 20px; overflow: hidden; background: #000; margin-bottom: 10px; position: relative; border: 2px solid rgba(255, 255, 255, 0.1); }
+        video, canvas { width: 100%; height: 100%; object-fit: contain; }
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; }
+        .pause-btn { background: linear-gradient(135deg, #555, #333); border-radius: 10px; padding: 10px 15px; font-size: 14px; width: 100%; margin-bottom: 15px; }
+        .custom-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 5px; outline: none; margin: 0 0 20px 0; cursor: pointer; }
+        .custom-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #ff9500; border: 3px solid #fff; cursor: pointer; margin-top: -7px; }
+        .custom-range::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: linear-gradient(to right, #ff9500 var(--progress, 0%), rgba(255, 255, 255, 0.2) var(--progress, 0%)); border-radius: 5px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 10px; }
+        .btn-group { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        button { position: relative; padding: 14px 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 18px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; color: white; font-family: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button:active { transform: scale(0.9); }
+        button:hover { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 25px var(--glow-color, rgba(255,255,255,0.2)); }
+        #startAiBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
+        #uploadBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
+        #switchCameraBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
+        #stopCameraBtn { --glow-color: rgba(220, 53, 69, 0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
+        #jumpCameraBtn, #jumpStandBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
+        #jumpGoBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
+        #uploadJumpBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
+        .btn-hit { --glow-color: rgba(40, 167, 69, 0.6); background: linear-gradient(135deg, #28a745, #1e7e34); }
+        .btn-miss { --glow-color: rgba(220, 53, 69, 0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
+        .basketball-icon, .miss-icon { background: transparent; -webkit-appearance: none; appearance: none; }
+        .basketball-icon { width: 26px; height: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); transition: transform 0.4s; }
+        .miss-icon { width: 18px; height: 18px; fill: white; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin-animation { animation: spin 0.4s ease; }
+        input:focus, select:focus { border-color: #ff9500 !important; box-shadow: 0 0 15px rgba(255, 149, 0, 0.3) !important; outline: none !important; }
+        #aiStatus, #aiStatusJump { font-size: 12px; color: #aaa; margin-bottom: 20px; margin-top: 10px; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-left: 4px solid #ff9500; text-align: left; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; margin-top: 10px; }
+        .stat-box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 20px 10px; position: relative; overflow: hidden; }
+        .stat-box::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, #ff9500, transparent); }
+        .stat-box h2 { font-size: 40px; font-weight: 900; line-height: 1; }
+        .stat-box span { font-size: 10px; color: rgba(255, 255, 255, 0.6); display: block; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        input, select { width: 100%; padding: 12px; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(0,0,0,0.5); color: white; font-family: inherit; font-size: 16px; outline: none; }
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ff9500' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; cursor: pointer; appearance: none; -webkit-appearance: none; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+        .chart-container { height: 300px; background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 20px; margin-bottom: 20px; position: relative; }
+        .court-map-container { width: 100%; margin-bottom: 20px; margin-top: 20px; }
+        .court-toolbar { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+        .court-toolbar button { padding: 8px 15px; font-size: 13px; }
+        #courtHitMode { --glow-color: rgba(40,167,69,0.6); background: linear-gradient(135deg, #28a745, #1e7e34); }
+        #courtMissMode { --glow-color: rgba(220,53,69,0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
+        .court-toolbar button.active-mode { transform: scale(1.05); box-shadow: 0 0 15px var(--glow-color); border: 2px solid white; }
+        .court-canvas { width: 100%; border-radius: 16px; overflow: hidden; position: relative; border: 2px solid rgba(255,255,255,0.1); background: #12121f; pointer-events: auto; cursor: crosshair; }
+        #basketballCourt { display: block; width: 100%; height: auto; pointer-events: none; }
+        .court-line { stroke: rgba(255,255,255,0.9); stroke-width: 3; fill: none; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255,255,255,0.3)); }
+        .court-arc { stroke: rgba(255,255,255,0.9); stroke-width: 3; fill: none; stroke-dasharray: 6,6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255,255,255,0.3)); }
+        .court-backboard { fill: rgba(255,255,255,0.05); stroke: #a67b5b; stroke-width: 4; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+        .court-board-rivets { fill: #a67b5b; }
+        .court-hoop-rim { stroke: #ff3b30; stroke-width: 6; fill: none; filter: drop-shadow(0 0 6px rgba(255,59,48,0.8)); }
+        .court-net { stroke: rgba(255,255,255,0.7); stroke-width: 2; fill: none; stroke-linejoin: round; }
+        .court-wood { fill: url(#woodGrad); }
+        .court-wood-line { stroke: rgba(120, 80, 50, 0.2); stroke-width: 1; }
+        .shot-marker { cursor: pointer; pointer-events: none; }
+        .shot-text { font-family: 'Unbounded', sans-serif; font-size: 12px; fill: white; font-weight: 700; pointer-events: none; }
+        .court-reset-btn { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.8); width: 100%; margin-top: 10px; }
+        @media (max-width: 600px) { body { padding: 10px; } .card { padding: 15px 12px; border-radius: 24px; } .tab-btn { font-size: 10px; padding: 10px; } .video-container { height: 200px; } button { padding: 12px 15px; font-size: 14px; } .stats { gap: 8px; } .stat-box { padding: 15px 5px; } .stat-box h2 { font-size: 28px; } .court-toolbar button { font-size: 11px; padding: 6px 10px; } }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Basketball Tracker Pro</h1>
+        <p class="subtitle">Твой комплексный спортивный помощник</p>
+        <a href="gym.html" class="nav-link">🏋️ Перейти в Зал (Анализ техники)</a>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('shooting')">Счётчик</button>
+            <button class="tab-btn" onclick="switchTab('jump')">Прыжок</button>
+            <button class="tab-btn" onclick="switchTab('profile')">Профиль</button>
+            <button class="tab-btn" onclick="switchTab('history')">История</button>
+        </div>
+
+        <div id="shooting-section" class="content-section active">
+            <div class="video-container"><video id="cameraFeed" autoplay playsinline muted></video><canvas id="overlayCanvas"></canvas></div>
+            <button id="playPauseVideo" class="pause-btn" style="display:none;">⏯ Пауза</button>
+            <input type="range" id="seekVideo" class="custom-range" min="0" max="100" value="0" style="display:none;">
+            <input type="file" id="videoUpload" accept="video/*" style="display:none;">
+            <div class="input-group">
+                <label>Высота кольца (в см, обычно 305)</label><input type="number" id="hoopHeight" placeholder="305">
+                <label style="margin-top:10px;">Твоя досягаемость стоя (в см, например 231)</label><input type="number" id="reachHeight" placeholder="231">
+                <label style="margin-top:10px;">Выбор камеры</label>
+                <select id="cameraSelectShooting"><option value="user">Фронтальная</option><option value="environment">Основная (задняя)</option></select>
+                <label style="margin-top:10px;">Качество записи (FPS)</label>
+                <select id="fpsShoot"><option value="30">30 FPS (Экономия)</option><option value="60" selected>60 FPS (Максимум)</option></select>
+            </div>
+            <div class="btn-group">
+                <button id="startAiBtn">Загрузить ИИ и камеру</button>
+                <button id="switchCameraBtn" style="display:none;">Сменить камеру</button>
+                <button id="stopCameraBtn" style="display:none;">Выключить камеру</button>
+                <button id="uploadBtn">Загрузить видео</button>
+            </div>
+            <div id="aiStatus">Статус: Введи данные и включи камеру.</div>
+
+            <div class="court-map-container">
+                <h3 style="color:#ff9500; margin-bottom:10px; font-size:14px;">Карта бросков (ручной ввод)</h3>
+                <div class="court-toolbar">
+                    <button id="courtHitMode" class="active-mode">Попал</button>
+                    <button id="courtMissMode">Мимо</button>
+                </div>
+                <div class="court-canvas" id="courtCanvas">
+                    <svg id="basketballCourt" viewBox="0 0 300 220">
+                        <defs><linearGradient id="woodGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#d9b382"/><stop offset="100%" stop-color="#c49a62"/></linearGradient></defs>
+                        <rect class="court-wood" x="0" y="0" width="300" height="220"/>
+                        <path class="court-wood-line" d="M 0 20 L 300 20 M 0 40 L 300 40 M 0 60 L 300 60 M 0 80 L 300 80 M 0 100 L 300 100 M 0 120 L 300 120 M 0 140 L 300 140 M 0 160 L 300 160 M 0 180 L 300 180 M 0 200 L 300 200 M 0 220 L 300 220" />
+                        <path class="court-line" d="M 10 20 L 290 20 L 290 200 L 10 200 Z" />
+                        <path class="court-line" d="M 10 200 L 290 200" />
+                        <path class="court-arc" d="M 30 20 L 30 60 Q 30 140, 150 140 Q 270 140, 270 60 L 270 20" />
+                        <rect x="110" y="20" width="80" height="100" fill="rgba(255,255,255,0.03)" />
+                        <path class="court-line" d="M 110 20 L 110 120 M 190 20 L 190 120" />
+                        <circle class="court-line" cx="150" cy="120" r="10" />
+                        <circle class="court-line" cx="150" cy="180" r="18" />
+                        <rect class="court-backboard" x="105" y="5" width="90" height="25" rx="6" />
+                        <circle class="court-board-rivets" cx="120" cy="15" r="3" />
+                        <circle class="court-board-rivets" cx="180" cy="15" r="3" />
+                        <path class="court-hoop-rim" d="M 140 30 Q 150 34 160 30" />
+                        <circle class="court-rim-dots" cx="141" cy="30" r="2.5" />
+                        <circle class="court-rim-dots" cx="159" cy="30" r="2.5" />
+                        <path class="court-net" d="M 145 33 L 150 39 L 155 33 M 145 33 L 140 39 L 150 39 M 155 33 L 160 39 L 150 39 M 140 39 L 145 45 L 150 39 M 160 39 L 155 45 L 150 39 M 145 45 L 150 51 L 155 45" />
+                    </svg>
+                </div>
+                <button class="court-reset-btn" onclick="resetCourt()">Сбросить карту</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-box"><h2 id="hits">0</h2><span>Попадания</span></div>
+                <div class="stat-box"><h2 id="total">0</h2><span>Всего</span></div>
+                <div class="stat-box"><h2 id="percent">0%</h2><span>Точность</span></div>
+            </div>
+            <div style="display:flex; gap:12px; margin-bottom:15px;">
+                <button id="hitBtn" class="btn-hit"><svg class="basketball-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#f68a1e" stroke="#8c4308" stroke-width="1.5"/><path d="M12 2 V22" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><path d="M2 12 H22" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><path d="M4.5 5 C 8 8, 8 16, 4.5 19" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><path d="M19.5 5 C 16 8, 16 16, 19.5 19" stroke="#8c4308" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="9" r="2.5" fill="rgba(255,255,255,0.2)"/></svg> Попал</button>
+                <button id="missBtn" class="btn-miss"><svg class="miss-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> Мимо</button>
+            </div>
+            <button id="resetBtn" style="background:transparent; border:2px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.8); width:100%; margin-top:10px;">Сбросить всё</button>
+            <button onclick="logShootingData()" style="background:#28a745; width:100%; margin-top:15px; padding:14px;">Записать сегодняшний % в историю</button>
+        </div>
+
+        <div id="jump-section" class="content-section">
+            <div class="video-container"><video id="jumpFeed" autoplay playsinline muted></video><canvas id="jumpCanvas"></canvas></div>
+            <button id="playPauseJump" class="pause-btn" style="display:none;">⏯ Пауза</button>
+            <input type="range" id="seekJump" class="custom-range" min="0" max="100" value="0" style="display:none;">
+            <input type="file" id="jumpUpload" accept="video/*" style="display:none;">
+            <div class="input-group">
+                <label>Твой точный рост (в см)</label><input type="number" id="userHeight" placeholder="180">
+            </div>
+            <div class="input-group">
+                <label>Тип прыжка</label>
+                <select id="jumpType"><option value="standing">С места (камера спереди)</option><option value="runup">С разбега (камера сбоку)</option><option value="dunk">Данк (по мячу)</option></select>
+                <label style="margin-top:10px;">Выбор камеры</label>
+                <select id="cameraSelectJump"><option value="user">Фронтальная</option><option value="environment">Основная (задняя)</option></select>
+                <label style="margin-top:10px;">Качество записи (FPS)</label>
+                <select id="fpsJump"><option value="30">30 FPS (Экономия)</option><option value="60" selected>60 FPS (Максимум)</option></select>
+            </div>
+            <div class="btn-group">
+                <button id="jumpCameraBtn">Включить камеру</button>
+                <button id="uploadJumpBtn">Загрузить видео</button>
+            </div>
+            <div class="btn-group">
+                <button id="jumpStandBtn" disabled style="background: linear-gradient(135deg, #00c2ff, #0082ff);">Калибровка</button>
+                <button id="jumpGoBtn" disabled style="background: linear-gradient(135deg, #ff9500, #ff5e00);">Прыгай!</button>
+            </div>
+            <div id="aiStatusJump">Статус: Введи рост и включи камеру.</div>
+            <div class="stats"><div class="stat-box"><h2 id="jumpResult">0</h2><span>Прыжок (в см)</span></div></div>
+            <button onclick="logJumpData()" style="background:#28a745; width:100%; margin-top:15px; padding:14px;">Записать прыжок в историю</button>
+        </div>
+
+        <div id="profile-section" class="content-section">
+            <div class="input-group"><label>Рост (в см)</label><input type="number" id="profileHeight" placeholder="180"><label style="margin-top:10px;">Вес (в кг)</label><input type="number" id="profileWeight" placeholder="75"><label style="margin-top:10px;">Максимальная точка касания стоя (в см)</label><input type="number" id="profileReach" placeholder="231"><label style="margin-top:10px;">Актуальный прыжок (в см)</label><input type="number" id="profileJump" placeholder="70"></div>
+            <button onclick="saveProfile()" style="background:#28a745; width:100%; margin-top:15px; padding:14px;">Сохранить мои данные</button>
+            <div id="profileStatus" style="font-size:12px; color:#ff9500; margin-top:10px;"></div>
+        </div>
+
+        <div id="history-section" class="content-section">
+            <div class="chart-container"><canvas id="trendChart"></canvas></div>
+            <div id="historyList" style="font-size:14px; color:rgba(255,255,255,0.6); text-align:left; max-height:200px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tab) { document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.querySelectorAll('.content-section').forEach(s=>s.classList.remove('active')); const tabs=['shooting','jump','profile','history']; document.querySelectorAll('.tab-btn')[tabs.indexOf(tab)].classList.add('active'); document.getElementById(tab+'-section').classList.add('active'); if(tab==='profile') loadProfile(); if(tab==='history') renderHistory(); }
+        function saveProfile() { const h=document.getElementById('profileHeight').value; const w=document.getElementById('profileWeight').value; const r=document.getElementById('profileReach').value; const j=document.getElementById('profileJump').value; localStorage.setItem('btp_height',h); localStorage.setItem('btp_weight',w); localStorage.setItem('btp_reach',r); localStorage.setItem('btp_jump',j); addHistoryEntry('weight',w); addHistoryEntry('jump',j); addHistoryEntry('height',h); addHistoryEntry('reach',r); document.getElementById('profileStatus').innerText="Данные сохранены!"; setTimeout(()=>document.getElementById('profileStatus').innerText="",2000); }
+        function loadProfile() { document.getElementById('profileHeight').value=localStorage.getItem('btp_height')||''; document.getElementById('profileWeight').value=localStorage.getItem('btp_weight')||''; document.getElementById('profileReach').value=localStorage.getItem('btp_reach')||''; document.getElementById('profileJump').value=localStorage.getItem('btp_jump')||''; document.getElementById('userHeight').value=localStorage.getItem('btp_height')||''; document.getElementById('reachHeight').value=localStorage.getItem('btp_reach')||''; }
+        function getHistory() { return localStorage.getItem('btp_history')?JSON.parse(localStorage.getItem('btp_history')):[]; }
+        function addHistoryEntry(type,value) { const history=getHistory(); const today=new Date().toLocaleDateString('ru-RU'); let last=history[history.length-1]; if(!last||last.date!==today) { last={date:today,weight:null,jump:null,shooting:null,height:null,reach:null}; history.push(last); } if(type==='weight')last.weight=value; if(type==='jump')last.jump=value; if(type==='shooting')last.shooting=value; if(type==='height')last.height=value; if(type==='reach')last.reach=value; localStorage.setItem('btp_history',JSON.stringify(history)); }
+        function logShootingData() { addHistoryEntry('shooting',parseFloat(document.getElementById('percent').innerText)||0); alert("Записано!"); }
+        function logJumpData() { addHistoryEntry('jump',parseFloat(document.getElementById('jumpResult').innerText)||0); alert("Записано!"); }
+        let myChart=null;
+        function renderHistory() { const history=getHistory(); const ctx=document.getElementById('trendChart').getContext('2d'); if(myChart)myChart.destroy(); const labels=history.map(e=>e.date); const w=history.map(e=>e.weight?parseFloat(e.weight):null); const j=history.map(e=>e.jump?parseFloat(e.jump):null); const s=history.map(e=>e.shooting?parseFloat(e.shooting):null); const h=history.map(e=>e.height?parseFloat(e.height):null); const r=history.map(e=>e.reach?parseFloat(e.reach):null); myChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:[{label:'Вес (кг)',data:w,borderColor:'#00c2ff',tension:0.4,spanGaps:true},{label:'Прыжок (см)',data:j,borderColor:'#ff9500',tension:0.4,spanGaps:true},{label:'Точность (%)',data:s,borderColor:'#28a745',tension:0.4,spanGaps:true},{label:'Рост (см)',data:h,borderColor:'#ffd000',borderDash:[5,5],tension:0.1,spanGaps:true},{label:'Досягаемость (см)',data:r,borderColor:'#ff5e00',borderDash:[5,5],tension:0.1,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'white',font:{family:'Unbounded',size:12}}}},scales:{x:{ticks:{color:'rgba(255,255,255,0.6)'},grid:{color:'rgba(255,255,255,0.1)'}},y:{ticks:{color:'rgba(255,255,255,0.6)'},grid:{color:'rgba(255,255,255,0.1)'}}}}}); document.getElementById('historyList').innerHTML=history.slice().reverse().map(e=>`<div style="margin-bottom:10px;"><strong style="color:#ff9500;">${e.date}:</strong> Вес: ${e.weight||'-'}кг | Прыжок: ${e.jump||'-'}см | Точность: ${e.shooting||'-'}% | Рост: ${e.height||'-'}см | Досягаемость: ${e.reach||'-'}см</div>`).join(''); }
+        function animateBall() { const icon = document.querySelector('#hitBtn .basketball-icon'); if (!icon) return; icon.classList.remove('spin-animation'); setTimeout(() => { icon.classList.add('spin-animation'); }, 10); }
+        const courtCanvas=document.getElementById('courtCanvas'); const svg=document.getElementById('basketballCourt'); let courtMode='hit'; const courtMapData={};
+        document.getElementById('courtHitMode').onclick=()=>{courtMode='hit'; document.getElementById('courtHitMode').classList.add('active-mode'); document.getElementById('courtMissMode').classList.remove('active-mode');};
+        document.getElementById('courtMissMode').onclick=()=>{courtMode='miss'; document.getElementById('courtMissMode').classList.add('active-mode'); document.getElementById('courtHitMode').classList.remove('active-mode');};
+        courtCanvas.addEventListener('click', function(e) { const rect=courtCanvas.getBoundingClientRect(); const scaleX=300/rect.width; const scaleY=220/rect.height; const x=(e.clientX-rect.left)*scaleX; const y=(e.clientY-rect.top)*scaleY; if (x >= 10 && x <= 290 && y >= 20 && y <= 200) { const gridX=Math.round(x/6)*6; const gridY=Math.round(y/6)*6; const key=`${gridX}-${gridY}`; if(!courtMapData[key]) courtMapData[key]={hits:0,misses:0}; if(courtMode==='hit') { courtMapData[key].hits++; hits++; total++; } else { courtMapData[key].misses++; total++; } updateStats(); renderCourtMap(); } });
+        function renderCourtMap() { document.querySelectorAll('.shot-marker, .shot-text').forEach(el=>el.remove()); for(const key in courtMapData) { const data=courtMapData[key]; const [x,y]=key.split('-').map(Number); const text=data.hits>0&&data.misses>0?`${data.hits}/${data.misses}`:(data.hits>0?`${data.hits}`:`${data.misses}`); const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('class','shot-marker'); circle.setAttribute('cx',x); circle.setAttribute('cy',y); circle.setAttribute('r','8'); circle.setAttribute('fill','rgba(40,167,69,0.8)'); circle.setAttribute('stroke','white'); circle.setAttribute('stroke-width','1.5'); svg.appendChild(circle); const textEl=document.createElementNS('http://www.w3.org/2000/svg','text'); textEl.setAttribute('class','shot-text'); textEl.setAttribute('x',x); textEl.setAttribute('y',y+3); textEl.setAttribute('text-anchor','middle'); textEl.textContent=text; svg.appendChild(textEl); } }
+        function resetCourt() { for(const key in courtMapData) delete courtMapData[key]; renderCourtMap(); }
+        document.getElementById('hitBtn').onclick=function(){hits++; total++; updateStats(); animateBall();};
+        document.getElementById('missBtn').onclick=function(){total++; updateStats();};
+        document.getElementById('resetBtn').onclick=function(){hits=0; total=0; updateStats();};
+        let hits=0,total=0;
+        function updateStats() { document.getElementById('hits').innerText=hits; document.getElementById('total').innerText=total; document.getElementById('percent').innerText=(total===0?0:Math.round((hits/total)*100))+'%'; }
+        const video=document.getElementById('cameraFeed'); const canvas=document.getElementById('overlayCanvas'); const ctx=canvas.getContext('2d'); const startBtn=document.getElementById('startAiBtn'); const switchCameraBtn=document.getElementById('switchCameraBtn'); const stopCameraBtn=document.getElementById('stopCameraBtn'); const uploadBtn=document.getElementById('uploadBtn'); const videoUploadInput=document.getElementById('videoUpload'); const statusEl=document.getElementById('aiStatus'); const seekVideo=document.getElementById('seekVideo'); const playPauseVideoBtn=document.getElementById('playPauseVideo'); const cameraSelectShooting=document.getElementById('cameraSelectShooting'); const fpsShoot=document.getElementById('fpsShoot');
+        let model,hoopBox,ballInHoop=false,aiActive=false,userReach=231,hoopHeightCM=305,detectionThrottleShoot=2,currentStream=null;
+        let previousBallCenter = null;
+        let lastAutoHitAt = 0;
+        function updateHoopBox(){
+            const vw = video.videoWidth || canvas.width || 640;
+            const vh = video.videoHeight || canvas.height || 480;
+            const targetY = vh - (vh / (hoopHeightCM / userReach)) - 70;
+            hoopBox = { x: (vw / 2) - 30, y: Math.max(0, Math.min(vh - 60, targetY)), width: 60, height: 60 };
+        }
+        async function startCamera(){if(currentStream) currentStream.getTracks().forEach(track=>track.stop()); const facingMode=cameraSelectShooting.value; const fps=parseInt(fpsShoot.value); detectionThrottleShoot=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); currentStream=stream; video.srcObject=stream; video.muted=true; video.play().then(()=>{canvas.width=video.videoWidth||640; canvas.height=video.videoHeight||480;}); return stream;}
+        startBtn.onclick=async function(){seekVideo.style.display='none'; playPauseVideoBtn.style.display='none'; statusEl.innerText="Статус: Включаем камеру..."; try{await startCamera(); statusEl.innerText="Статус: Камера работает. Загружаем нейросеть..."; if(!model) model=await cocoSsd.load(); aiActive=true; statusEl.innerText="Статус: ИИ готов!"; startBtn.style.display='none'; switchCameraBtn.style.display='block'; stopCameraBtn.style.display='block'; detectFrame();}catch(error){statusEl.innerText="Ошибка камеры."; console.error(error);}};
+        switchCameraBtn.onclick=async function(){statusEl.innerText="Статус: Переключаем камеру..."; await startCamera(); statusEl.innerText="Статус: Камера переключена!";};
+        stopCameraBtn.onclick=function(){if(currentStream) currentStream.getTracks().forEach(track=>track.stop()); currentStream=null; video.srcObject=null; aiActive=false; statusEl.innerText="Статус: Камера выключена."; startBtn.style.display='block'; switchCameraBtn.style.display='none'; stopCameraBtn.style.display='none';};
+        uploadBtn.onclick=()=>videoUploadInput.click();
+        videoUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){statusEl.innerText="Статус: Загружаем видео..."; const url=URL.createObjectURL(file); video.src=url; video.srcObject=null; video.loop=true; video.muted=true; video.play(); video.onloadedmetadata=()=>{canvas.width=video.videoWidth; canvas.height=video.videoHeight; seekVideo.style.display='block'; playPauseVideoBtn.style.display='block';}; seekVideo.max=100; seekVideo.value=0; video.addEventListener('timeupdate',()=>{const p=(video.currentTime/video.duration)*100; seekVideo.value=p; seekVideo.style.setProperty('--progress',p+'%');}); seekVideo.addEventListener('input',()=>{video.currentTime=(seekVideo.value/100)*video.duration;}); playPauseVideoBtn.onclick=()=>{if(video.paused){video.play(); playPauseVideoBtn.innerText="⏯ Пауза";}else{video.pause(); playPauseVideoBtn.innerText="▶ Играть";}}; hits=0; total=0; updateStats(); hoopBox=null; if(!model)model=await cocoSsd.load(); aiActive=true; detectFrame();}};
+        let frameCounter=0;
+        async function detectFrame(){
+            if(!aiActive)return;
+            frameCounter++;
+            if(frameCounter%detectionThrottleShoot!==0){requestAnimationFrame(detectFrame); return;}
+            try {
+                if(video.readyState < 2 || !video.videoWidth){requestAnimationFrame(detectFrame); return;}
+                const predictions=await model.detect(video);
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                updateHoopBox();
+                if(hoopBox){
+                    ctx.strokeStyle='rgba(0,255,0,0.5)'; ctx.lineWidth=3; ctx.setLineDash([5,5]);
+                    ctx.strokeRect(hoopBox.x,hoopBox.y,hoopBox.width,hoopBox.height); ctx.setLineDash([]);
+                }
+                // Берём самое уверенное распознавание мяча, чтобы не считать несколько рамок за один бросок.
+                const ball = predictions
+                    .filter(p => p.class === 'sports ball' && p.score >= 0.45 && p.bbox[2] >= 8 && p.bbox[3] >= 8)
+                    .sort((a,b) => b.score - a.score)[0];
+                if(ball){
+                    const [x,y,w,h] = ball.bbox;
+                    const bx=x+w/2, by=y+h/2;
+                    ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h);
+                    if(hoopBox){
+                        // Засчитываем только пересечение верхней границы зоны кольца сверху вниз,
+                        // а не любое появление мяча внутри прямоугольника.
+                        const crossedDown = previousBallCenter &&
+                            previousBallCenter.y < hoopBox.y &&
+                            by >= hoopBox.y &&
+                            by <= hoopBox.y + hoopBox.height + 18;
+                        const withinHoopWidth = bx >= hoopBox.x - 8 && bx <= hoopBox.x + hoopBox.width + 8;
+                        const now = Date.now();
+                        if(crossedDown && withinHoopWidth && now - lastAutoHitAt > 900){
+                            hits++; total++; updateStats(); lastAutoHitAt = now;
+                        }
+                    }
+                    previousBallCenter = {x:bx,y:by};
+                } else {
+                    // Сохраняем последнюю позицию недолго: пропущенный кадр не должен создавать бросок.
+                    previousBallCenter = null;
+                }
+            } catch(error) {
+                console.error('Ошибка анализа мяча:', error);
+                statusEl.innerText = 'Статус: Ошибка анализа кадра. Попробуй перезапустить ИИ.';
+            }
+            if(aiActive) requestAnimationFrame(detectFrame);
+        }
+        const jumpVideo=document.getElementById('jumpFeed'); const jumpCanvas=document.getElementById('jumpCanvas'); const jumpCtx=jumpCanvas.getContext('2d'); const jumpCameraBtn=document.getElementById('jumpCameraBtn'); const jumpStandBtn=document.getElementById('jumpStandBtn'); const jumpGoBtn=document.getElementById('jumpGoBtn'); const jumpUploadBtn=document.getElementById('uploadJumpBtn'); const jumpUploadInput=document.getElementById('jumpUpload'); const statusJump=document.getElementById('aiStatusJump'); const jumpResultEl=document.getElementById('jumpResult'); const jumpTypeSelect=document.getElementById('jumpType'); const seekJump=document.getElementById('seekJump'); const playPauseJumpBtn=document.getElementById('playPauseJump'); const cameraSelectJump=document.getElementById('cameraSelectJump'); const fpsJump=document.getElementById('fpsJump');
+        let jumpModel=null, standingBox=null, userRealHeight=180, isJumping=false, currentJumpMode='standing', detectionThrottleJump=2;
+        jumpTypeSelect.addEventListener('change',function(){currentJumpMode=this.value; if(currentJumpMode==='runup')statusJump.innerText="Статус: Поставь телефон СБОКУ."; else if(currentJumpMode==='dunk')statusJump.innerText="Статус: Наведи камеру на мяч."; else statusJump.innerText="Статус: Камера перед тобой.";});
+        jumpCameraBtn.onclick=async function(){seekJump.style.display='none'; playPauseJumpBtn.style.display='none'; statusJump.innerText="Статус: Включаем камеру..."; try{const facingMode=cameraSelectJump.value; const fps=parseInt(fpsJump.value); detectionThrottleJump=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); jumpVideo.srcObject=stream; jumpVideo.muted=true; jumpVideo.play().then(()=>{jumpCanvas.width=jumpVideo.videoWidth||640; jumpCanvas.height=jumpVideo.videoHeight||480;}); if(!jumpModel) jumpModel=await cocoSsd.load(); jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; statusJump.innerText="Статус: Нажми 'Калибровка'.";}catch(error){statusJump.innerText="Ошибка камеры.";}};
+        jumpUploadBtn.onclick=()=>jumpUploadInput.click();
+        jumpUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){const url=URL.createObjectURL(file); jumpVideo.src=url; jumpVideo.srcObject=null; jumpVideo.loop=true; jumpVideo.muted=true; jumpVideo.play(); jumpVideo.onloadedmetadata=()=>{jumpCanvas.width=jumpVideo.videoWidth; jumpCanvas.height=jumpVideo.videoHeight; seekJump.style.display='block'; playPauseJumpBtn.style.display='block';}; seekJump.max=100; seekJump.value=0; jumpVideo.addEventListener('timeupdate',()=>{const p=(jumpVideo.currentTime/jumpVideo.duration)*100; seekJump.value=p; seekJump.style.setProperty('--progress',p+'%');}); seekJump.addEventListener('input',()=>{jumpVideo.currentTime=(seekJump.value/100)*jumpVideo.duration;}); playPauseJumpBtn.onclick=()=>{if(jumpVideo.paused){jumpVideo.play(); playPauseJumpBtn.innerText="⏯ Пауза";}else{jumpVideo.pause(); playPauseJumpBtn.innerText="▶ Играть";}}; statusJump.innerText="Статус: Нажми 'Калибровка'."; jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; isJumping=false; standingBox=null; if(!jumpModel) jumpModel=await cocoSsd.load();}};
+        jumpStandBtn.onclick=async function(){
+            userRealHeight=parseFloat(document.getElementById('userHeight').value)||180;
+            statusJump.innerText="Статус: Калибруемся...";
+            if(!jumpModel)jumpModel=await cocoSsd.load();
+            const predictions=await jumpModel.detect(jumpVideo);
+            const personPrediction=predictions.filter(p=>p.class==='person'&&p.score>=0.45).sort((a,b)=>b.score-a.score)[0];
+            const ballPrediction=predictions.filter(p=>p.class==='sports ball'&&p.score>=0.45).sort((a,b)=>b.score-a.score)[0];
+            if(currentJumpMode==='dunk'){
+                if(ballPrediction){
+                    standingBox=ballPrediction.bbox;
+                    statusJump.innerText="Статус: Мяч найден! Нажми «Прыгай!» для отслеживания.";
+                    jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;
+                } else statusJump.innerText="Статус: Мяч не найден. Помести мяч в кадр и повтори калибровку.";
+            } else if(personPrediction){
+                standingBox=personPrediction.bbox;
+                statusJump.innerText="Статус: Игрок найден! Нажми «Прыгай!»";
+                jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;
+            } else {
+                standingBox=null;
+                statusJump.innerText="Статус: Не вижу игрока. Покажи тело целиком и повтори калибровку.";
+            }
+        };
+        jumpGoBtn.onclick=function(){statusJump.innerText="Статус: Прыгай!"; jumpGoBtn.disabled=true; isJumping=true; jumpResultEl.innerText="0"; detectJump();};
+        let jumpFrameCounter=0;
+        async function detectJump(){
+            if(!isJumping||!jumpModel||!standingBox)return;
+            jumpFrameCounter++;
+            if(jumpFrameCounter%detectionThrottleJump!==0){requestAnimationFrame(detectJump); return;}
+            try {
+                const predictions=await jumpModel.detect(jumpVideo);
+                const wantedClass=currentJumpMode==='dunk'?'sports ball':'person';
+                const detected=predictions.filter(p=>p.class===wantedClass&&p.score>=0.45).sort((a,b)=>b.score-a.score)[0];
+                if(detected){
+                    const currentBox=detected.bbox;
+                    const pixelJump=standingBox[1]-currentBox[1];
+                    // Для прыжка игрока переводим пиксели в сантиметры по высоте человека при калибровке.
+                    // В режиме данка показываем вертикальное смещение мяча относительно его калибровки.
+                    const scaleHeight=currentJumpMode==='dunk'?userRealHeight: userRealHeight;
+                    const cm=(scaleHeight/Math.max(1,standingBox[3]))*pixelJump;
+                    if(cm>0)jumpResultEl.innerText=Math.max(0,Math.round(cm));
+                }
+            } catch(error) {
+                console.error('Ошибка анализа прыжка:',error);
+                statusJump.innerText='Статус: Не удалось обработать кадр. Попробуй ещё раз.';
+            }
+            if(isJumping)requestAnimationFrame(detectJump);
+        }
+        loadProfile();
+    </script>
+</body>
+</html>
