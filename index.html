@@ -223,7 +223,14 @@
         function updateStats() { document.getElementById('hits').innerText=hits; document.getElementById('total').innerText=total; document.getElementById('percent').innerText=(total===0?0:Math.round((hits/total)*100))+'%'; }
         const video=document.getElementById('cameraFeed'); const canvas=document.getElementById('overlayCanvas'); const ctx=canvas.getContext('2d'); const startBtn=document.getElementById('startAiBtn'); const switchCameraBtn=document.getElementById('switchCameraBtn'); const stopCameraBtn=document.getElementById('stopCameraBtn'); const uploadBtn=document.getElementById('uploadBtn'); const videoUploadInput=document.getElementById('videoUpload'); const statusEl=document.getElementById('aiStatus'); const seekVideo=document.getElementById('seekVideo'); const playPauseVideoBtn=document.getElementById('playPauseVideo'); const cameraSelectShooting=document.getElementById('cameraSelectShooting'); const fpsShoot=document.getElementById('fpsShoot');
         let model,hoopBox,ballInHoop=false,aiActive=false,userReach=231,hoopHeightCM=305,detectionThrottleShoot=2,currentStream=null;
-        function updateHoopBox(){const vh=video.videoHeight; hoopBox={x:(video.videoWidth/2)-30,y:vh-(vh/(hoopHeightCM/userReach))-70,width:60,height:60};}
+        let previousBallCenter = null;
+        let lastAutoHitAt = 0;
+        function updateHoopBox(){
+            const vw = video.videoWidth || canvas.width || 640;
+            const vh = video.videoHeight || canvas.height || 480;
+            const targetY = vh - (vh / (hoopHeightCM / userReach)) - 70;
+            hoopBox = { x: (vw / 2) - 30, y: Math.max(0, Math.min(vh - 60, targetY)), width: 60, height: 60 };
+        }
         async function startCamera(){if(currentStream) currentStream.getTracks().forEach(track=>track.stop()); const facingMode=cameraSelectShooting.value; const fps=parseInt(fpsShoot.value); detectionThrottleShoot=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); currentStream=stream; video.srcObject=stream; video.muted=true; video.play().then(()=>{canvas.width=video.videoWidth||640; canvas.height=video.videoHeight||480;}); return stream;}
         startBtn.onclick=async function(){seekVideo.style.display='none'; playPauseVideoBtn.style.display='none'; statusEl.innerText="Статус: Включаем камеру..."; try{await startCamera(); statusEl.innerText="Статус: Камера работает. Загружаем нейросеть..."; if(!model) model=await cocoSsd.load(); aiActive=true; statusEl.innerText="Статус: ИИ готов!"; startBtn.style.display='none'; switchCameraBtn.style.display='block'; stopCameraBtn.style.display='block'; detectFrame();}catch(error){statusEl.innerText="Ошибка камеры."; console.error(error);}};
         switchCameraBtn.onclick=async function(){statusEl.innerText="Статус: Переключаем камеру..."; await startCamera(); statusEl.innerText="Статус: Камера переключена!";};
@@ -231,17 +238,104 @@
         uploadBtn.onclick=()=>videoUploadInput.click();
         videoUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){statusEl.innerText="Статус: Загружаем видео..."; const url=URL.createObjectURL(file); video.src=url; video.srcObject=null; video.loop=true; video.muted=true; video.play(); video.onloadedmetadata=()=>{canvas.width=video.videoWidth; canvas.height=video.videoHeight; seekVideo.style.display='block'; playPauseVideoBtn.style.display='block';}; seekVideo.max=100; seekVideo.value=0; video.addEventListener('timeupdate',()=>{const p=(video.currentTime/video.duration)*100; seekVideo.value=p; seekVideo.style.setProperty('--progress',p+'%');}); seekVideo.addEventListener('input',()=>{video.currentTime=(seekVideo.value/100)*video.duration;}); playPauseVideoBtn.onclick=()=>{if(video.paused){video.play(); playPauseVideoBtn.innerText="⏯ Пауза";}else{video.pause(); playPauseVideoBtn.innerText="▶ Играть";}}; hits=0; total=0; updateStats(); hoopBox=null; if(!model)model=await cocoSsd.load(); aiActive=true; detectFrame();}};
         let frameCounter=0;
-        async function detectFrame(){if(!aiActive)return; frameCounter++; if(frameCounter%detectionThrottleShoot!==0){requestAnimationFrame(detectFrame); return;} const predictions=await model.detect(video); ctx.clearRect(0,0,canvas.width,canvas.height); updateHoopBox(); if(hoopBox){ctx.strokeStyle='rgba(0,255,0,0.5)'; ctx.lineWidth=3; ctx.setLineDash([5,5]); ctx.strokeRect(hoopBox.x,hoopBox.y,hoopBox.width,hoopBox.height); ctx.setLineDash([]);} for(let i=0;i<predictions.length;i++){const p=predictions[i]; if(p.class==='sports ball'){ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.strokeRect(p.bbox[0],p.bbox[1],p.bbox[2],p.bbox[3]); if(hoopBox){const bx=p.bbox[0]+p.bbox[2]/2, by=p.bbox[1]+p.bbox[3]/2; const isInside=bx>hoopBox.x&&bx<hoopBox.x+hoopBox.width&&by>hoopBox.y&&by<hoopBox.y+hoopBox.height; if(isInside&&!ballInHoop){hits++; total++; updateStats(); ballInHoop=true;} else if(!isInside) ballInHoop=false;}}} requestAnimationFrame(detectFrame);}
+        async function detectFrame(){
+            if(!aiActive)return;
+            frameCounter++;
+            if(frameCounter%detectionThrottleShoot!==0){requestAnimationFrame(detectFrame); return;}
+            try {
+                if(video.readyState < 2 || !video.videoWidth){requestAnimationFrame(detectFrame); return;}
+                const predictions=await model.detect(video);
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                updateHoopBox();
+                if(hoopBox){
+                    ctx.strokeStyle='rgba(0,255,0,0.5)'; ctx.lineWidth=3; ctx.setLineDash([5,5]);
+                    ctx.strokeRect(hoopBox.x,hoopBox.y,hoopBox.width,hoopBox.height); ctx.setLineDash([]);
+                }
+                // Берём самое уверенное распознавание мяча, чтобы не считать несколько рамок за один бросок.
+                const ball = predictions
+                    .filter(p => p.class === 'sports ball' && p.score >= 0.45 && p.bbox[2] >= 8 && p.bbox[3] >= 8)
+                    .sort((a,b) => b.score - a.score)[0];
+                if(ball){
+                    const [x,y,w,h] = ball.bbox;
+                    const bx=x+w/2, by=y+h/2;
+                    ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h);
+                    if(hoopBox){
+                        // Засчитываем только пересечение верхней границы зоны кольца сверху вниз,
+                        // а не любое появление мяча внутри прямоугольника.
+                        const crossedDown = previousBallCenter &&
+                            previousBallCenter.y < hoopBox.y &&
+                            by >= hoopBox.y &&
+                            by <= hoopBox.y + hoopBox.height + 18;
+                        const withinHoopWidth = bx >= hoopBox.x - 8 && bx <= hoopBox.x + hoopBox.width + 8;
+                        const now = Date.now();
+                        if(crossedDown && withinHoopWidth && now - lastAutoHitAt > 900){
+                            hits++; total++; updateStats(); lastAutoHitAt = now;
+                        }
+                    }
+                    previousBallCenter = {x:bx,y:by};
+                } else {
+                    // Сохраняем последнюю позицию недолго: пропущенный кадр не должен создавать бросок.
+                    previousBallCenter = null;
+                }
+            } catch(error) {
+                console.error('Ошибка анализа мяча:', error);
+                statusEl.innerText = 'Статус: Ошибка анализа кадра. Попробуй перезапустить ИИ.';
+            }
+            if(aiActive) requestAnimationFrame(detectFrame);
+        }
         const jumpVideo=document.getElementById('jumpFeed'); const jumpCanvas=document.getElementById('jumpCanvas'); const jumpCtx=jumpCanvas.getContext('2d'); const jumpCameraBtn=document.getElementById('jumpCameraBtn'); const jumpStandBtn=document.getElementById('jumpStandBtn'); const jumpGoBtn=document.getElementById('jumpGoBtn'); const jumpUploadBtn=document.getElementById('uploadJumpBtn'); const jumpUploadInput=document.getElementById('jumpUpload'); const statusJump=document.getElementById('aiStatusJump'); const jumpResultEl=document.getElementById('jumpResult'); const jumpTypeSelect=document.getElementById('jumpType'); const seekJump=document.getElementById('seekJump'); const playPauseJumpBtn=document.getElementById('playPauseJump'); const cameraSelectJump=document.getElementById('cameraSelectJump'); const fpsJump=document.getElementById('fpsJump');
         let jumpModel=null, standingBox=null, userRealHeight=180, isJumping=false, currentJumpMode='standing', detectionThrottleJump=2;
         jumpTypeSelect.addEventListener('change',function(){currentJumpMode=this.value; if(currentJumpMode==='runup')statusJump.innerText="Статус: Поставь телефон СБОКУ."; else if(currentJumpMode==='dunk')statusJump.innerText="Статус: Наведи камеру на мяч."; else statusJump.innerText="Статус: Камера перед тобой.";});
         jumpCameraBtn.onclick=async function(){seekJump.style.display='none'; playPauseJumpBtn.style.display='none'; statusJump.innerText="Статус: Включаем камеру..."; try{const facingMode=cameraSelectJump.value; const fps=parseInt(fpsJump.value); detectionThrottleJump=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); jumpVideo.srcObject=stream; jumpVideo.muted=true; jumpVideo.play().then(()=>{jumpCanvas.width=jumpVideo.videoWidth||640; jumpCanvas.height=jumpVideo.videoHeight||480;}); if(!jumpModel) jumpModel=await cocoSsd.load(); jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; statusJump.innerText="Статус: Нажми 'Калибровка'.";}catch(error){statusJump.innerText="Ошибка камеры.";}};
         jumpUploadBtn.onclick=()=>jumpUploadInput.click();
         jumpUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){const url=URL.createObjectURL(file); jumpVideo.src=url; jumpVideo.srcObject=null; jumpVideo.loop=true; jumpVideo.muted=true; jumpVideo.play(); jumpVideo.onloadedmetadata=()=>{jumpCanvas.width=jumpVideo.videoWidth; jumpCanvas.height=jumpVideo.videoHeight; seekJump.style.display='block'; playPauseJumpBtn.style.display='block';}; seekJump.max=100; seekJump.value=0; jumpVideo.addEventListener('timeupdate',()=>{const p=(jumpVideo.currentTime/jumpVideo.duration)*100; seekJump.value=p; seekJump.style.setProperty('--progress',p+'%');}); seekJump.addEventListener('input',()=>{jumpVideo.currentTime=(seekJump.value/100)*jumpVideo.duration;}); playPauseJumpBtn.onclick=()=>{if(jumpVideo.paused){jumpVideo.play(); playPauseJumpBtn.innerText="⏯ Пауза";}else{jumpVideo.pause(); playPauseJumpBtn.innerText="▶ Играть";}}; statusJump.innerText="Статус: Нажми 'Калибровка'."; jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; isJumping=false; standingBox=null; if(!jumpModel) jumpModel=await cocoSsd.load();}};
-        jumpStandBtn.onclick=async function(){userRealHeight=parseFloat(document.getElementById('userHeight').value)||180; statusJump.innerText="Статус: Калибруемся..."; if(!jumpModel)jumpModel=await cocoSsd.load(); const predictions=await jumpModel.detect(jumpVideo); let foundUser=false,foundBall=false; for(let i=0;i<predictions.length;i++){if(predictions[i].class==='person'&&!foundUser){standingBox=predictions[i].bbox; foundUser=true;} if(predictions[i].class==='sports ball'){standingBox=predictions[i].bbox; foundBall=true;}} if(currentJumpMode==='dunk'){if(foundBall){statusJump.innerText="Статус: Мяч найден! Прыгай!"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Мяч не найден.";} else {if(foundUser){statusJump.innerText="Статус: Стоишь! Нажми 'Прыгай!'"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Не вижу тебя.";}};
+        jumpStandBtn.onclick=async function(){
+            userRealHeight=parseFloat(document.getElementById('userHeight').value)||180;
+            statusJump.innerText="Статус: Калибруемся...";
+            if(!jumpModel)jumpModel=await cocoSsd.load();
+            const predictions=await jumpModel.detect(jumpVideo);
+            const personPrediction=predictions.filter(p=>p.class==='person'&&p.score>=0.45).sort((a,b)=>b.score-a.score)[0];
+            const ballPrediction=predictions.filter(p=>p.class==='sports ball'&&p.score>=0.45).sort((a,b)=>b.score-a.score)[0];
+            if(currentJumpMode==='dunk'){
+                if(ballPrediction){
+                    standingBox=ballPrediction.bbox;
+                    statusJump.innerText="Статус: Мяч найден! Нажми «Прыгай!» для отслеживания.";
+                    jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;
+                } else statusJump.innerText="Статус: Мяч не найден. Помести мяч в кадр и повтори калибровку.";
+            } else if(personPrediction){
+                standingBox=personPrediction.bbox;
+                statusJump.innerText="Статус: Игрок найден! Нажми «Прыгай!»";
+                jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;
+            } else {
+                standingBox=null;
+                statusJump.innerText="Статус: Не вижу игрока. Покажи тело целиком и повтори калибровку.";
+            }
+        };
         jumpGoBtn.onclick=function(){statusJump.innerText="Статус: Прыгай!"; jumpGoBtn.disabled=true; isJumping=true; jumpResultEl.innerText="0"; detectJump();};
         let jumpFrameCounter=0;
-        async function detectJump(){if(!isJumping)return; jumpFrameCounter++; if(jumpFrameCounter%detectionThrottleJump!==0){requestAnimationFrame(detectJump); return;} const predictions=await jumpModel.detect(jumpVideo); let currentBox=null; for(let i=0;i<predictions.length;i++){if(currentJumpMode==='dunk'){if(predictions[i].class==='sports ball'){currentBox=predictions[i].bbox; break;}} else {if(predictions[i].class==='person'){currentBox=predictions[i].bbox; break;}}} if(currentBox&&standingBox){const pixelJump=standingBox[1]-currentBox[1]; const cm=(userRealHeight/standingBox[3])*pixelJump; if(cm>0)jumpResultEl.innerText=Math.round(cm);} requestAnimationFrame(detectJump);}
+        async function detectJump(){
+            if(!isJumping||!jumpModel||!standingBox)return;
+            jumpFrameCounter++;
+            if(jumpFrameCounter%detectionThrottleJump!==0){requestAnimationFrame(detectJump); return;}
+            try {
+                const predictions=await jumpModel.detect(jumpVideo);
+                const wantedClass=currentJumpMode==='dunk'?'sports ball':'person';
+                const detected=predictions.filter(p=>p.class===wantedClass&&p.score>=0.45).sort((a,b)=>b.score-a.score)[0];
+                if(detected){
+                    const currentBox=detected.bbox;
+                    const pixelJump=standingBox[1]-currentBox[1];
+                    // Для прыжка игрока переводим пиксели в сантиметры по высоте человека при калибровке.
+                    // В режиме данка показываем вертикальное смещение мяча относительно его калибровки.
+                    const scaleHeight=currentJumpMode==='dunk'?userRealHeight: userRealHeight;
+                    const cm=(scaleHeight/Math.max(1,standingBox[3]))*pixelJump;
+                    if(cm>0)jumpResultEl.innerText=Math.max(0,Math.round(cm));
+                }
+            } catch(error) {
+                console.error('Ошибка анализа прыжка:',error);
+                statusJump.innerText='Статус: Не удалось обработать кадр. Попробуй ещё раз.';
+            }
+            if(isJumping)requestAnimationFrame(detectJump);
+        }
         loadProfile();
     </script>
 </body>
