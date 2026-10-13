@@ -31,9 +31,9 @@
         .input-group { margin-bottom: 20px; text-align: left; }
         .input-group label { display: block; font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-bottom: 10px; }
         .btn-group { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        button { position: relative; padding: 14px 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 18px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; color: white; font-family: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        button:active { transform: scale(0.9); }
-        button:hover { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 25px var(--glow-color, rgba(255,255,255,0.2)); }
+        button, .file-upload-label { position: relative; padding: 14px 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 18px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; color: white; font-family: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button:active, .file-upload-label:active { transform: scale(0.9); }
+        button:hover, .file-upload-label:hover { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 25px var(--glow-color, rgba(255,255,255,0.2)); }
         #startAiBtn { --glow-color: rgba(255, 149, 0, 0.6); background: linear-gradient(135deg, #ff9500, #ff5e00); }
         #uploadBtn { --glow-color: rgba(168, 85, 247, 0.6); background: linear-gradient(135deg, #a855f7, #7c3aed); }
         #switchCameraBtn { --glow-color: rgba(0, 194, 255, 0.6); background: linear-gradient(135deg, #00c2ff, #0082ff); }
@@ -98,7 +98,7 @@
             <div class="video-container"><video id="cameraFeed" autoplay playsinline muted></video><canvas id="overlayCanvas"></canvas></div>
             <button id="playPauseVideo" class="pause-btn" style="display:none;">⏯ Пауза</button>
             <input type="range" id="seekVideo" class="custom-range" min="0" max="100" value="0" style="display:none;">
-            <input type="file" id="videoUpload" accept="video/*" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;z-index:9999;">
+            <input type="file" id="videoUpload" accept="video/*" style="display:none;">
             <div class="input-group">
                 <label>Высота кольца (в см, обычно 305)</label><input type="number" id="hoopHeight" placeholder="305">
                 <label style="margin-top:10px;">Твоя досягаемость стоя (в см, например 231)</label><input type="number" id="reachHeight" placeholder="231">
@@ -111,7 +111,7 @@
                 <button id="startAiBtn">Загрузить ИИ и камеру</button>
                 <button id="switchCameraBtn" style="display:none;">Сменить камеру</button>
                 <button id="stopCameraBtn" style="display:none;">Выключить камеру</button>
-                <button id="uploadBtn">Загрузить видео</button>
+                <label id="uploadBtn" class="file-upload-label" for="videoUpload" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;font-size:15px;font-weight:600;border:none;border-radius:18px;cursor:pointer;color:white;font-family:inherit;overflow:hidden;">Загрузить видео</label>
             </div>
             <div id="aiStatus">Статус: Введи данные и включи камеру.</div>
 
@@ -162,7 +162,7 @@
             <div class="video-container"><video id="jumpFeed" autoplay playsinline muted></video><canvas id="jumpCanvas"></canvas></div>
             <button id="playPauseJump" class="pause-btn" style="display:none;">⏯ Пауза</button>
             <input type="range" id="seekJump" class="custom-range" min="0" max="100" value="0" style="display:none;">
-            <input type="file" id="jumpUpload" accept="video/*" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;z-index:9999;">
+            <input type="file" id="jumpUpload" accept="video/*" style="display:none;">
             <div class="input-group">
                 <label>Твой точный рост (в см)</label><input type="number" id="userHeight" placeholder="180">
             </div>
@@ -176,7 +176,7 @@
             </div>
             <div class="btn-group">
                 <button id="jumpCameraBtn">Включить камеру</button>
-                <button id="uploadJumpBtn">Загрузить видео</button>
+                <label id="uploadJumpBtn" class="file-upload-label" for="jumpUpload" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;font-size:15px;font-weight:600;border:none;border-radius:18px;cursor:pointer;color:white;font-family:inherit;overflow:hidden;">Загрузить видео</label>
             </div>
             <div class="btn-group">
                 <button id="jumpStandBtn" disabled style="background: linear-gradient(135deg, #00c2ff, #0082ff);">Калибровка</button>
@@ -228,7 +228,6 @@
         startBtn.onclick=async function(){seekVideo.style.display='none'; playPauseVideoBtn.style.display='none'; statusEl.innerText="Статус: Включаем камеру..."; try{await startCamera(); statusEl.innerText="Статус: Камера работает. Загружаем нейросеть..."; if(!model) model=await cocoSsd.load(); aiActive=true; statusEl.innerText="Статус: ИИ готов!"; startBtn.style.display='none'; switchCameraBtn.style.display='block'; stopCameraBtn.style.display='block'; detectFrame();}catch(error){statusEl.innerText="Ошибка камеры."; console.error(error);}};
         switchCameraBtn.onclick=async function(){statusEl.innerText="Статус: Переключаем камеру..."; await startCamera(); statusEl.innerText="Статус: Камера переключена!";};
         stopCameraBtn.onclick=function(){if(currentStream) currentStream.getTracks().forEach(track=>track.stop()); currentStream=null; video.srcObject=null; aiActive=false; statusEl.innerText="Статус: Камера выключена."; startBtn.style.display='block'; switchCameraBtn.style.display='none'; stopCameraBtn.style.display='none';};
-        uploadBtn.addEventListener('click', function(){ try { if (typeof videoUploadInput.showPicker === 'function') videoUploadInput.showPicker(); else videoUploadInput.click(); } catch(err) { videoUploadInput.click(); } });
         videoUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){statusEl.innerText="Статус: Загружаем видео..."; const url=URL.createObjectURL(file); video.src=url; video.srcObject=null; video.loop=true; video.muted=true; video.play(); video.onloadedmetadata=()=>{canvas.width=video.videoWidth; canvas.height=video.videoHeight; seekVideo.style.display='block'; playPauseVideoBtn.style.display='block';}; seekVideo.max=100; seekVideo.value=0; video.addEventListener('timeupdate',()=>{const p=(video.currentTime/video.duration)*100; seekVideo.value=p; seekVideo.style.setProperty('--progress',p+'%');}); seekVideo.addEventListener('input',()=>{video.currentTime=(seekVideo.value/100)*video.duration;}); playPauseVideoBtn.onclick=()=>{if(video.paused){video.play(); playPauseVideoBtn.innerText="⏯ Пауза";}else{video.pause(); playPauseVideoBtn.innerText="▶ Играть";}}; hits=0; total=0; updateStats(); hoopBox=null; if(!model)model=await cocoSsd.load(); aiActive=true; detectFrame();}};
         let frameCounter=0;
         async function detectFrame(){if(!aiActive)return; frameCounter++; if(frameCounter%detectionThrottleShoot!==0){requestAnimationFrame(detectFrame); return;} const predictions=await model.detect(video); ctx.clearRect(0,0,canvas.width,canvas.height); updateHoopBox(); if(hoopBox){ctx.strokeStyle='rgba(0,255,0,0.5)'; ctx.lineWidth=3; ctx.setLineDash([5,5]); ctx.strokeRect(hoopBox.x,hoopBox.y,hoopBox.width,hoopBox.height); ctx.setLineDash([]);} for(let i=0;i<predictions.length;i++){const p=predictions[i]; if(p.class==='sports ball'){ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.strokeRect(p.bbox[0],p.bbox[1],p.bbox[2],p.bbox[3]); if(hoopBox){const bx=p.bbox[0]+p.bbox[2]/2, by=p.bbox[1]+p.bbox[3]/2; const isInside=bx>hoopBox.x&&bx<hoopBox.x+hoopBox.width&&by>hoopBox.y&&by<hoopBox.y+hoopBox.height; if(isInside&&!ballInHoop){hits++; total++; updateStats(); ballInHoop=true;} else if(!isInside) ballInHoop=false;}}} requestAnimationFrame(detectFrame);}
@@ -236,7 +235,6 @@
         let jumpModel=null, standingBox=null, userRealHeight=180, isJumping=false, currentJumpMode='standing', detectionThrottleJump=2;
         jumpTypeSelect.addEventListener('change',function(){currentJumpMode=this.value; if(currentJumpMode==='runup')statusJump.innerText="Статус: Поставь телефон СБОКУ."; else if(currentJumpMode==='dunk')statusJump.innerText="Статус: Наведи камеру на мяч."; else statusJump.innerText="Статус: Камера перед тобой.";});
         jumpCameraBtn.onclick=async function(){seekJump.style.display='none'; playPauseJumpBtn.style.display='none'; statusJump.innerText="Статус: Включаем камеру..."; try{const facingMode=cameraSelectJump.value; const fps=parseInt(fpsJump.value); detectionThrottleJump=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); jumpVideo.srcObject=stream; jumpVideo.muted=true; jumpVideo.play().then(()=>{jumpCanvas.width=jumpVideo.videoWidth||640; jumpCanvas.height=jumpVideo.videoHeight||480;}); if(!jumpModel) jumpModel=await cocoSsd.load(); jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; statusJump.innerText="Статус: Нажми 'Калибровка'.";}catch(error){statusJump.innerText="Ошибка камеры.";}};
-        jumpUploadBtn.addEventListener('click', function(){ try { if (typeof jumpUploadInput.showPicker === 'function') jumpUploadInput.showPicker(); else jumpUploadInput.click(); } catch(err) { jumpUploadInput.click(); } });
         jumpUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){const url=URL.createObjectURL(file); jumpVideo.src=url; jumpVideo.srcObject=null; jumpVideo.loop=true; jumpVideo.muted=true; jumpVideo.play(); jumpVideo.onloadedmetadata=()=>{jumpCanvas.width=jumpVideo.videoWidth; jumpCanvas.height=jumpVideo.videoHeight; seekJump.style.display='block'; playPauseJumpBtn.style.display='block';}; seekJump.max=100; seekJump.value=0; jumpVideo.addEventListener('timeupdate',()=>{const p=(jumpVideo.currentTime/jumpVideo.duration)*100; seekJump.value=p; seekJump.style.setProperty('--progress',p+'%');}); seekJump.addEventListener('input',()=>{jumpVideo.currentTime=(seekJump.value/100)*jumpVideo.duration;}); playPauseJumpBtn.onclick=()=>{if(jumpVideo.paused){jumpVideo.play(); playPauseJumpBtn.innerText="⏯ Пауза";}else{jumpVideo.pause(); playPauseJumpBtn.innerText="▶ Играть";}}; statusJump.innerText="Статус: Нажми 'Калибровка'."; jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; isJumping=false; standingBox=null; if(!jumpModel) jumpModel=await cocoSsd.load();}};
         jumpStandBtn.onclick=async function(){userRealHeight=parseFloat(document.getElementById('userHeight').value)||180; statusJump.innerText="Статус: Калибруемся..."; if(!jumpModel)jumpModel=await cocoSsd.load(); const predictions=await jumpModel.detect(jumpVideo); let foundUser=false,foundBall=false; for(let i=0;i<predictions.length;i++){if(predictions[i].class==='person'&&!foundUser){standingBox=predictions[i].bbox; foundUser=true;} if(predictions[i].class==='sports ball'){standingBox=predictions[i].bbox; foundBall=true;}} if(currentJumpMode==='dunk'){if(foundBall){statusJump.innerText="Статус: Мяч найден! Прыгай!"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Мяч не найден.";} else {if(foundUser){statusJump.innerText="Статус: Стоишь! Нажми 'Прыгай!'"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Не вижу тебя.";}};
         jumpGoBtn.onclick=function(){statusJump.innerText="Статус: Прыгай!"; jumpGoBtn.disabled=true; isJumping=true; jumpResultEl.innerText="0"; detectJump();};
