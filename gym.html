@@ -249,27 +249,27 @@
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем ИИ-модель (MediaPipe)...";
             try {
-                // Load MediaPipe as a classic module script, as recommended by Google.
-                // This avoids dynamic-import CDN resolution problems on some mobile browsers.
-                const vision = await new Promise((resolve, reject) => {
-                    if (window.__mediaPipeVision) return resolve(window.__mediaPipeVision);
-                    const script = document.createElement('script');
-                    script.type = 'module';
-                    script.crossOrigin = 'anonymous';
-                    script.textContent = `
-                        import * as vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs";
-                        window.__mediaPipeVision = vision;
-                        window.dispatchEvent(new Event("mediapipe-vision-ready"));
-                    `;
-                    const timeout = setTimeout(() => reject(new Error("Браузер не смог загрузить MediaPipe с CDN")), 20000);
-                    window.addEventListener("mediapipe-vision-ready", function ready() {
-                        clearTimeout(timeout);
-                        window.removeEventListener("mediapipe-vision-ready", ready);
-                        resolve(window.__mediaPipeVision);
-                    }, { once: true });
-                    script.onerror = () => { clearTimeout(timeout); reject(new Error("CDN MediaPipe недоступен")); };
-                    document.head.appendChild(script);
-                });
+                // Try several public CDNs; some networks block or fail to resolve one provider.
+                let vision = null;
+                const cdnUrls = [
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs",
+                    "https://unpkg.com/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs",
+                    "https://esm.sh/@mediapipe/tasks-vision@0.10.22"
+                ];
+                let lastCdnError = null;
+                for (const url of cdnUrls) {
+                    try {
+                        statusTech.innerText = "Статус: Подключаем ИИ (" + new URL(url).hostname + ")...";
+                        vision = await import(url);
+                        if (vision && vision.PoseLandmarker && vision.FilesetResolver) break;
+                        throw new Error("CDN загружен, но API MediaPipe не найден");
+                    } catch (cdnError) {
+                        lastCdnError = cdnError;
+                        console.warn("MediaPipe CDN failed:", url, cdnError);
+                        vision = null;
+                    }
+                }
+                if (!vision) throw new Error("Не удалось загрузить библиотеку MediaPipe ни с одного CDN. Последняя ошибка: " + (lastCdnError && lastCdnError.message ? lastCdnError.message : "unknown"));
                 const fileset = await vision.FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
                 );
