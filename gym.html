@@ -238,23 +238,30 @@
         let repCount = 0;
         let currentAngle = 0;
 
-        // Для детекции экстремумов
-        let angleHistory = [];        // храним последние 5 углов
-        let lastExtreme = null;      // 'min' или 'max' – последний найденный экстремум
+        // Устойчивый счётчик повторений: сглаживание угла + подтверждение смены направления.
+        // Предыдущая версия искала экстремумы в коротком окне и содержала дублирующий блок
+        // подсчёта, из-за чего повторения часто терялись или считались нестабильно.
+        let angleHistory = [];
+        let smoothedAngle = null;
+        let movementDirection = 0; // -1 угол уменьшается, 1 увеличивается
+        let candidateExtreme = null;
+        let lastCompletedExtreme = null;
         let minAngle = Infinity;
         let maxAngle = -Infinity;
         let amplitudeSum = 0;
         let qualityReps = 0;
+        let extremeHold = 0;
 
-        // Флаг, чтобы не засчитывать одно и то же движение дважды
-        let waitingForOpposite = false;
-
-        // Загрузка модели
         async function initPose() {
             statusTech.innerText = "Статус: Загружаем нейросеть (PoseNet)...";
             try {
                 await tf.ready();
-                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 1.0 });
+                net = await posenet.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    inputResolution: 257,
+                    multiplier: 1.0
+                });
                 statusTech.innerText = "Статус: ИИ загружен! Загрузи видео.";
             } catch (error) {
                 statusTech.innerText = "Ошибка загрузки: " + error.message;
@@ -262,182 +269,160 @@
             }
         }
 
-        // Сброс всех счётчиков
         function resetCounters() {
             repCount = 0;
             currentAngle = 0;
             angleHistory = [];
-            lastExtreme = null;
+            smoothedAngle = null;
+            movementDirection = 0;
+            candidateExtreme = null;
+            lastCompletedExtreme = null;
             minAngle = Infinity;
             maxAngle = -Infinity;
             amplitudeSum = 0;
             qualityReps = 0;
-            waitingForOpposite = false;
+            extremeHold = 0;
             repCounterOverlay.innerText = 'Повторов: 0';
             angleDisplay.innerText = '0°';
         }
 
-        // Обновление отчёта
         function generateReport() {
-            let report = `📊 ИТОГОВЫЙ ОТЧЁТ\n`;
-            report += `Повторений: ${repCount}\n`;
+            let report = '📊 ИТОГОВЫЙ ОТЧЁТ\\n';
+            report += 'Повторений: ' + repCount + '\\n';
             if (repCount > 0) {
                 const avgAmplitude = amplitudeSum / repCount;
-                report += `Средняя амплитуда: ${Math.round(avgAmplitude)}°\n`;
-                // Оценка качества: если амплитуда > 45° – хорошо
+                report += 'Средняя амплитуда: ' + Math.round(avgAmplitude) + '°\\n';
                 const quality = avgAmplitude > 45 ? '✅ Отлично' : (avgAmplitude > 30 ? '⚠️ Средне' : '❌ Малая амплитуда');
-                report += `Качество: ${quality}`;
+                report += 'Качество: ' + quality;
             } else {
-                report += `Повторений не зафиксировано. Попробуй снять видео с бóльшей амплитудой.`;
+                report += 'Повторений не зафиксировано. Проверь, чтобы рука/сустав были видны сбоку и целиком.';
             }
-            statusTech.innerText = "Статус: Анализ завершён!\n" + report;
+            statusTech.innerText = 'Статус: Анализ завершён!\\n' + report;
         }
 
-        // Рисование скелета
         function drawSkeleton(keypoints) {
             techCtx.clearRect(0, 0, techCanvas.width, techCanvas.height);
-            if (keypoints && keypoints.length > 0) {
-                const connections = [
-                    [5,7], [7,9], [6,8], [8,10],
-                    [11,13], [13,15], [12,14], [14,16],
-                    [5,6], [5,11], [6,12], [11,12]
-                ];
-                techCtx.strokeStyle = '#00ff00';
-                techCtx.lineWidth = 4;
-                techCtx.beginPath();
-                connections.forEach(([a,b]) => {
-                    if (keypoints[a] && keypoints[b] && keypoints[a].position && keypoints[b].position) {
-                        techCtx.moveTo(keypoints[a].position.x * techCanvas.width, keypoints[a].position.y * techCanvas.height);
-                        techCtx.lineTo(keypoints[b].position.x * techCanvas.width, keypoints[b].position.y * techCanvas.height);
-                    }
-                });
-                techCtx.stroke();
-                techCtx.fillStyle = '#ff9500';
-                for (let i = 0; i < keypoints.length; i++) {
-                    if (keypoints[i] && keypoints[i].position) {
-                        techCtx.beginPath();
-                        techCtx.arc(keypoints[i].position.x * techCanvas.width, keypoints[i].position.y * techCanvas.height, 6, 0, 2 * Math.PI);
-                        techCtx.fill();
-                    }
+            if (!keypoints || !keypoints.length) return;
+            const connections = [[5,7],[7,9],[6,8],[8,10],[11,13],[13,15],[12,14],[14,16],[5,6],[5,11],[6,12],[11,12]];
+            techCtx.strokeStyle = '#00ff00';
+            techCtx.lineWidth = 3;
+            techCtx.beginPath();
+            connections.forEach(([a,b]) => {
+                const ka = keypoints[a], kb = keypoints[b];
+                if (ka && kb && ka.score > 0.2 && kb.score > 0.2) {
+                    techCtx.moveTo(ka.position.x, ka.position.y);
+                    techCtx.lineTo(kb.position.x, kb.position.y);
                 }
-            }
+            });
+            techCtx.stroke();
+            techCtx.fillStyle = '#ff9500';
+            keypoints.forEach(k => {
+                if (k && k.position && k.score > 0.2) {
+                    techCtx.beginPath();
+                    techCtx.arc(k.position.x, k.position.y, 4, 0, 2 * Math.PI);
+                    techCtx.fill();
+                }
+            });
         }
 
-        // Вычисление угла (плечо-локоть-запястье)
         function calculateAngle(a, b, c) {
             if (!a || !b || !c || !a.position || !b.position || !c.position) return null;
+            if (a.score < 0.2 || b.score < 0.2 || c.score < 0.2) return null;
             const radians = Math.atan2(c.position.y - b.position.y, c.position.x - b.position.x) -
-                             Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
+                            Math.atan2(a.position.y - b.position.y, a.position.x - b.position.x);
+            let angle = Math.abs(radians * 180 / Math.PI);
+            if (angle > 180) angle = 360 - angle;
+            return Number.isFinite(angle) ? angle : null;
         }
 
-        // Основной цикл анализа
+        function registerAngleSample(angle) {
+            angleHistory.push(angle);
+            if (angleHistory.length > 5) angleHistory.shift();
+            smoothedAngle = angleHistory.reduce((sum, value) => sum + value, 0) / angleHistory.length;
+            angleDisplay.innerText = Math.round(smoothedAngle) + '°';
+
+            if (candidateExtreme === null) {
+                candidateExtreme = { angle: smoothedAngle, type: null };
+                return;
+            }
+
+            const delta = smoothedAngle - candidateExtreme.angle;
+            const nextDirection = Math.abs(delta) >= 2.5 ? (delta > 0 ? 1 : -1) : movementDirection;
+
+            if (movementDirection === 0) {
+                if (nextDirection !== 0) movementDirection = nextDirection;
+                candidateExtreme.angle = smoothedAngle;
+                return;
+            }
+
+            // Обновляем экстремум, пока движение идёт в прежнем направлении.
+            if (nextDirection === movementDirection || nextDirection === 0) {
+                if (movementDirection > 0) {
+                    candidateExtreme.angle = Math.max(candidateExtreme.angle, smoothedAngle);
+                    candidateExtreme.type = 'max';
+                } else {
+                    candidateExtreme.angle = Math.min(candidateExtreme.angle, smoothedAngle);
+                    candidateExtreme.type = 'min';
+                }
+                extremeHold = 0;
+                return;
+            }
+
+            // Смена направления считается настоящей только после заметного отката от пика.
+            const reversal = Math.abs(smoothedAngle - candidateExtreme.angle);
+            if (reversal < 7) return;
+            extremeHold++;
+            if (extremeHold < 2) return;
+
+            const reachedType = candidateExtreme.type;
+            const reachedAngle = candidateExtreme.angle;
+            if (reachedType && lastCompletedExtreme && reachedType === lastCompletedExtreme.type) {
+                const amplitude = Math.abs(reachedAngle - lastCompletedExtreme.angle);
+                // Считаем только завершённый полный цикл между однотипными крайними точками.
+                if (amplitude >= 25) {
+                    repCount++;
+                    amplitudeSum += amplitude;
+                    if (amplitude > 45) qualityReps++;
+                    repCounterOverlay.innerText = 'Повторов: ' + repCount;
+                    statusTech.innerText = 'Статус: Повтор #' + repCount + ' (ампл. ' + Math.round(amplitude) + '°)';
+                }
+            }
+            if (reachedType) lastCompletedExtreme = { type: reachedType, angle: reachedAngle };
+
+            movementDirection = nextDirection;
+            candidateExtreme = {
+                angle: smoothedAngle,
+                type: movementDirection > 0 ? 'max' : 'min'
+            };
+            extremeHold = 0;
+        }
+
         async function detectTechnique() {
-            if (!isAnalyzing || !net || techVideo.readyState < 2) {
-                requestAnimationFrame(detectTechnique);
+            if (!isAnalyzing || !net || techVideo.readyState < 2 || techVideo.paused || techVideo.ended) {
+                if (isAnalyzing && !techVideo.ended) requestAnimationFrame(detectTechnique);
                 return;
             }
 
             try {
-                const pose = await net.estimateSinglePose(techVideo);
+                const pose = await net.estimateSinglePose(techVideo, { flipHorizontal: false });
                 if (pose && pose.keypoints) {
                     drawSkeleton(pose.keypoints);
-
-                    // Берём левую или правую руку (смотрим, какая видна лучше)
-                    const lShoulder = pose.keypoints[5];
-                    const lElbow = pose.keypoints[7];
-                    const lWrist = pose.keypoints[9];
-                    const rShoulder = pose.keypoints[6];
-                    const rElbow = pose.keypoints[8];
-                    const rWrist = pose.keypoints[10];
-
+                    const left = calculateAngle(pose.keypoints[5], pose.keypoints[7], pose.keypoints[9]);
+                    const right = calculateAngle(pose.keypoints[6], pose.keypoints[8], pose.keypoints[10]);
                     let bestAngle = null;
-                    if (lShoulder && lElbow && lWrist && lShoulder.score > 0.5) {
-                        bestAngle = calculateAngle(lShoulder, lElbow, lWrist);
-                    }
-                    if (rShoulder && rElbow && rWrist && rShoulder.score > 0.5) {
-                        const a = calculateAngle(rShoulder, rElbow, rWrist);
-                        if (a !== null && (bestAngle === null || a > bestAngle)) bestAngle = a;
-                    }
+                    if (left !== null && right !== null) bestAngle = (left + right) / 2;
+                    else if (left !== null) bestAngle = left;
+                    else if (right !== null) bestAngle = right;
 
                     if (bestAngle !== null && bestAngle > 0 && bestAngle < 180) {
                         currentAngle = bestAngle;
-                        angleDisplay.innerText = Math.round(bestAngle) + '°';
-
-                        // === НОВАЯ ЛОГИКА ДЕТЕКЦИИ ПОВТОРЕНИЙ (поиск экстремумов) ===
-                        angleHistory.push(bestAngle);
-                        if (angleHistory.length > 7) angleHistory.shift();
-
-                        // Если у нас есть минимум и максимум в истории – определяем движение
-                        if (angleHistory.length === 7) {
-                            const min = Math.min(...angleHistory);
-                            const max = Math.max(...angleHistory);
-                            const diff = max - min;
-
-                            // Если амплитуда больше 15° – считаем значимой
-                            if (diff > 15) {
-                                // Определяем, где сейчас находимся: ближе к минимуму или максимуму
-                                const current = angleHistory[angleHistory.length - 1];
-                                const isNearMin = Math.abs(current - min) < 5;
-                                const isNearMax = Math.abs(current - max) < 5;
-
-                                if (isNearMin && lastExtreme !== 'min') {
-                                    // Достигли минимума
-                                    lastExtreme = 'min';
-                                    if (waitingForOpposite && minAngle < Infinity) {
-                                        // Засчитываем повторение, если предыдущий экстремум был max
-                                        const amplitude = maxAngle - minAngle;
-                                        if (amplitude > 20) {
-                                            repCount++;
-                                            amplitudeSum += amplitude;
-                                            if (amplitude > 45) qualityReps++;
-                                            repCounterOverlay.innerText = 'Повторов: ' + repCount;
-                                            // Обновляем статус
-                                            statusTech.innerText = `Статус: Повтор #${repCount} (ампл. ${Math.round(amplitude)}°)`;
-                                        }
-                                        waitingForOpposite = false;
-                                        // Сброс для следующего цикла
-                                        minAngle = Infinity;
-                                        maxAngle = -Infinity;
-                                    }
-                                    // Обновляем минимум
-                                    if (current < minAngle) minAngle = current;
-                                }
-                                else if (isNearMax && lastExtreme !== 'max') {
-                                    // Достигли максимума
-                                    lastExtreme = 'max';
-                                    if (waitingForOpposite && maxAngle > -Infinity) {
-                                        // аналогично, но для обратного движения
-                                        const amplitude = maxAngle - minAngle;
-                                        if (amplitude > 20) {
-                                            repCount++;
-                                            amplitudeSum += amplitude;
-                                            if (amplitude > 45) qualityReps++;
-                                            repCounterOverlay.innerText = 'Повторов: ' + repCount;
-                                            statusTech.innerText = `Статус: Повтор #${repCount} (ампл. ${Math.round(amplitude)}°)`;
-                                        }
-                                        waitingForOpposite = false;
-                                        minAngle = Infinity;
-                                        maxAngle = -Infinity;
-                                    }
-                                    if (current > maxAngle) maxAngle = current;
-                                }
-
-                                // Если мы нашли и минимум, и максимум, готовимся к следующему повтору
-                                if (minAngle !== Infinity && maxAngle !== -Infinity) {
-                                    waitingForOpposite = true;
-                                }
-                            }
-                        }
+                        registerAngleSample(bestAngle);
                     }
                 }
             } catch (e) {
-                console.warn("Ошибка при обработке кадра:", e);
+                console.warn('Ошибка при обработке кадра:', e);
             }
-
-            requestAnimationFrame(detectTechnique);
+            if (isAnalyzing && !techVideo.paused && !techVideo.ended) requestAnimationFrame(detectTechnique);
         }
 
         // === ЗАГРУЗКА ВИДЕО ===
