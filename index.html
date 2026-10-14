@@ -6,6 +6,7 @@
     <title>Basketball Tracker Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -231,15 +232,249 @@
         videoUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){statusEl.innerText="Статус: Загружаем видео..."; const url=URL.createObjectURL(file); video.src=url; video.srcObject=null; video.loop=true; video.muted=true; video.play(); video.onloadedmetadata=()=>{canvas.width=video.videoWidth; canvas.height=video.videoHeight; seekVideo.style.display='block'; playPauseVideoBtn.style.display='block';}; seekVideo.max=100; seekVideo.value=0; video.addEventListener('timeupdate',()=>{const p=(video.currentTime/video.duration)*100; seekVideo.value=p; seekVideo.style.setProperty('--progress',p+'%');}); seekVideo.addEventListener('input',()=>{video.currentTime=(seekVideo.value/100)*video.duration;}); playPauseVideoBtn.onclick=()=>{if(video.paused){video.play(); playPauseVideoBtn.innerText="⏯ Пауза";}else{video.pause(); playPauseVideoBtn.innerText="▶ Играть";}}; hits=0; total=0; updateStats(); hoopBox=null; if(!model)model=await cocoSsd.load(); aiActive=true; detectFrame();}};
         let frameCounter=0;
         async function detectFrame(){if(!aiActive)return; frameCounter++; if(frameCounter%detectionThrottleShoot!==0){requestAnimationFrame(detectFrame); return;} const predictions=await model.detect(video); ctx.clearRect(0,0,canvas.width,canvas.height); updateHoopBox(); if(hoopBox){ctx.strokeStyle='rgba(0,255,0,0.5)'; ctx.lineWidth=3; ctx.setLineDash([5,5]); ctx.strokeRect(hoopBox.x,hoopBox.y,hoopBox.width,hoopBox.height); ctx.setLineDash([]);} for(let i=0;i<predictions.length;i++){const p=predictions[i]; if(p.class==='sports ball'){ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.strokeRect(p.bbox[0],p.bbox[1],p.bbox[2],p.bbox[3]); if(hoopBox){const bx=p.bbox[0]+p.bbox[2]/2, by=p.bbox[1]+p.bbox[3]/2; const isInside=bx>hoopBox.x&&bx<hoopBox.x+hoopBox.width&&by>hoopBox.y&&by<hoopBox.y+hoopBox.height; if(isInside&&!ballInHoop){hits++; total++; updateStats(); ballInHoop=true;} else if(!isInside) ballInHoop=false;}}} requestAnimationFrame(detectFrame);}
-        const jumpVideo=document.getElementById('jumpFeed'); const jumpCanvas=document.getElementById('jumpCanvas'); const jumpCtx=jumpCanvas.getContext('2d'); const jumpCameraBtn=document.getElementById('jumpCameraBtn'); const jumpStandBtn=document.getElementById('jumpStandBtn'); const jumpGoBtn=document.getElementById('jumpGoBtn'); const jumpUploadBtn=document.getElementById('uploadJumpBtn'); const jumpUploadInput=document.getElementById('jumpUpload'); const statusJump=document.getElementById('aiStatusJump'); const jumpResultEl=document.getElementById('jumpResult'); const jumpTypeSelect=document.getElementById('jumpType'); const seekJump=document.getElementById('seekJump'); const playPauseJumpBtn=document.getElementById('playPauseJump'); const cameraSelectJump=document.getElementById('cameraSelectJump'); const fpsJump=document.getElementById('fpsJump');
-        let jumpModel=null, standingBox=null, userRealHeight=180, isJumping=false, currentJumpMode='standing', detectionThrottleJump=2;
-        jumpTypeSelect.addEventListener('change',function(){currentJumpMode=this.value; if(currentJumpMode==='runup')statusJump.innerText="Статус: Поставь телефон СБОКУ."; else if(currentJumpMode==='dunk')statusJump.innerText="Статус: Наведи камеру на мяч."; else statusJump.innerText="Статус: Камера перед тобой.";});
-        jumpCameraBtn.onclick=async function(){seekJump.style.display='none'; playPauseJumpBtn.style.display='none'; statusJump.innerText="Статус: Включаем камеру..."; try{const facingMode=cameraSelectJump.value; const fps=parseInt(fpsJump.value); detectionThrottleJump=fps===60?3:2; const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}}}); jumpVideo.srcObject=stream; jumpVideo.muted=true; jumpVideo.play().then(()=>{jumpCanvas.width=jumpVideo.videoWidth||640; jumpCanvas.height=jumpVideo.videoHeight||480;}); if(!jumpModel) jumpModel=await cocoSsd.load(); jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; statusJump.innerText="Статус: Нажми 'Калибровка'.";}catch(error){statusJump.innerText="Ошибка камеры.";}};
-        jumpUploadInput.onchange=async function(e){const file=e.target.files[0]; if(file){const url=URL.createObjectURL(file); jumpVideo.src=url; jumpVideo.srcObject=null; jumpVideo.loop=true; jumpVideo.muted=true; jumpVideo.play(); jumpVideo.onloadedmetadata=()=>{jumpCanvas.width=jumpVideo.videoWidth; jumpCanvas.height=jumpVideo.videoHeight; seekJump.style.display='block'; playPauseJumpBtn.style.display='block';}; seekJump.max=100; seekJump.value=0; jumpVideo.addEventListener('timeupdate',()=>{const p=(jumpVideo.currentTime/jumpVideo.duration)*100; seekJump.value=p; seekJump.style.setProperty('--progress',p+'%');}); seekJump.addEventListener('input',()=>{jumpVideo.currentTime=(seekJump.value/100)*jumpVideo.duration;}); playPauseJumpBtn.onclick=()=>{if(jumpVideo.paused){jumpVideo.play(); playPauseJumpBtn.innerText="⏯ Пауза";}else{jumpVideo.pause(); playPauseJumpBtn.innerText="▶ Играть";}}; statusJump.innerText="Статус: Нажми 'Калибровка'."; jumpStandBtn.disabled=false; jumpGoBtn.disabled=true; isJumping=false; standingBox=null; if(!jumpModel) jumpModel=await cocoSsd.load();}};
-        jumpStandBtn.onclick=async function(){userRealHeight=parseFloat(document.getElementById('userHeight').value)||180; statusJump.innerText="Статус: Калибруемся..."; if(!jumpModel)jumpModel=await cocoSsd.load(); const predictions=await jumpModel.detect(jumpVideo); let foundUser=false,foundBall=false; for(let i=0;i<predictions.length;i++){if(predictions[i].class==='person'&&!foundUser){standingBox=predictions[i].bbox; foundUser=true;} if(predictions[i].class==='sports ball'){standingBox=predictions[i].bbox; foundBall=true;}} if(currentJumpMode==='dunk'){if(foundBall){statusJump.innerText="Статус: Мяч найден! Прыгай!"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Мяч не найден.";} else {if(foundUser){statusJump.innerText="Статус: Стоишь! Нажми 'Прыгай!'"; jumpGoBtn.disabled=false; jumpStandBtn.disabled=true;} else statusJump.innerText="Статус: Не вижу тебя.";}};
-        jumpGoBtn.onclick=function(){statusJump.innerText="Статус: Прыгай!"; jumpGoBtn.disabled=true; isJumping=true; jumpResultEl.innerText="0"; detectJump();};
-        let jumpFrameCounter=0;
-        async function detectJump(){if(!isJumping)return; jumpFrameCounter++; if(jumpFrameCounter%detectionThrottleJump!==0){requestAnimationFrame(detectJump); return;} const predictions=await jumpModel.detect(jumpVideo); let currentBox=null; for(let i=0;i<predictions.length;i++){if(currentJumpMode==='dunk'){if(predictions[i].class==='sports ball'){currentBox=predictions[i].bbox; break;}} else {if(predictions[i].class==='person'){currentBox=predictions[i].bbox; break;}}} if(currentBox&&standingBox){const pixelJump=standingBox[1]-currentBox[1]; const cm=(userRealHeight/standingBox[3])*pixelJump; if(cm>0)jumpResultEl.innerText=Math.round(cm);} requestAnimationFrame(detectJump);}
+        const jumpVideo=document.getElementById('jumpFeed');
+        const jumpCanvas=document.getElementById('jumpCanvas');
+        const jumpCtx=jumpCanvas.getContext('2d');
+        const jumpCameraBtn=document.getElementById('jumpCameraBtn');
+        const jumpStandBtn=document.getElementById('jumpStandBtn');
+        const jumpGoBtn=document.getElementById('jumpGoBtn');
+        const jumpUploadInput=document.getElementById('jumpUpload');
+        const statusJump=document.getElementById('aiStatusJump');
+        const jumpResultEl=document.getElementById('jumpResult');
+        const jumpTypeSelect=document.getElementById('jumpType');
+        const seekJump=document.getElementById('seekJump');
+        const playPauseJumpBtn=document.getElementById('playPauseJump');
+        const cameraSelectJump=document.getElementById('cameraSelectJump');
+        const fpsJump=document.getElementById('fpsJump');
+        let jumpModel=null, isJumping=false, currentJumpMode='standing', scanToken=0, jumpStream=null;
+
+        jumpTypeSelect.addEventListener('change',function(){
+            currentJumpMode=this.value;
+            const messages={
+                standing:'Режим «С места»: загрузи видео целиком. ИИ сама найдёт отталкивание и приземление.',
+                runup:'Режим «С разбега»: лучше снимай сбоку, чтобы были видны ноги и весь разбег.',
+                dunk:'Режим «Данк»: сними сбоку или под углом, чтобы были видны прыжок и кольцо.'
+            };
+            statusJump.innerText='Статус: '+messages[currentJumpMode];
+        });
+
+        async function ensureJumpModel(){
+            if(jumpModel) return jumpModel;
+            statusJump.innerText='Статус: Загружаю ИИ скелета…';
+            await tf.ready();
+            jumpModel=await poseDetection.createDetector(
+                poseDetection.SupportedModels.MoveNet,
+                {modelType:poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING, enableSmoothing:true}
+            );
+            return jumpModel;
+        }
+
+        jumpCameraBtn.onclick=async function(){
+            try{
+                if(jumpStream){jumpStream.getTracks().forEach(t=>t.stop());jumpStream=null;}
+                const facingMode=cameraSelectJump.value;
+                const fps=parseInt(fpsJump.value)||30;
+                statusJump.innerText='Статус: Включаю камеру…';
+                jumpStream=await navigator.mediaDevices.getUserMedia({video:{facingMode,frameRate:{ideal:fps,max:fps}},audio:false});
+                jumpVideo.srcObject=jumpStream;
+                await jumpVideo.play();
+                jumpCanvas.width=jumpVideo.videoWidth||640;
+                jumpCanvas.height=jumpVideo.videoHeight||480;
+                await ensureJumpModel();
+                jumpStandBtn.disabled=false;
+                jumpGoBtn.disabled=false;
+                statusJump.innerText='Камера готова. Нажми «Прыгай!» — ИИ будет отслеживать движение автоматически. Для итогового замера точнее загрузить записанное видео.';
+            }catch(error){
+                statusJump.innerText='Не удалось запустить ИИ/камеру: '+(error.message||error)+'. Проверь разрешение камеры и подключение к интернету.';
+            }
+        };
+
+        jumpUploadInput.onchange=async function(e){
+            const file=e.target.files&&e.target.files[0];
+            if(!file)return;
+            scanToken++;
+            isJumping=false;
+            if(jumpStream){jumpStream.getTracks().forEach(t=>t.stop());jumpStream=null;}
+            jumpVideo.pause();
+            jumpVideo.srcObject=null;
+            jumpVideo.src=URL.createObjectURL(file);
+            jumpVideo.loop=false;
+            jumpVideo.muted=true;
+            seekJump.style.display='block';
+            playPauseJumpBtn.style.display='block';
+            statusJump.innerText='Статус: Открываю видео…';
+            jumpVideo.onloadedmetadata=async()=>{
+                jumpCanvas.width=jumpVideo.videoWidth||640;
+                jumpCanvas.height=jumpVideo.videoHeight||480;
+                seekJump.max=100;
+                seekJump.value=0;
+                try{
+                    await ensureJumpModel();
+                    jumpVideo.pause();
+                    statusJump.innerText='Видео загружено. Запускаю автоматический анализ всего ролика…';
+                    jumpStandBtn.disabled=true;
+                    jumpGoBtn.disabled=true;
+                    analyzeUploadedJump();
+                }catch(error){
+                    statusJump.innerText='Не удалось загрузить ИИ скелета: '+(error.message||error)+'. Проверь интернет и попробуй ещё раз.';
+                }
+            };
+            jumpVideo.onerror=()=>{statusJump.innerText='Не удалось прочитать видео. Попробуй MP4 (H.264).';};
+        };
+
+        seekJump.addEventListener('input',()=>{
+            if(Number.isFinite(jumpVideo.duration)&&jumpVideo.duration>0)
+                jumpVideo.currentTime=(Number(seekJump.value)/100)*jumpVideo.duration;
+        });
+        jumpVideo.addEventListener('timeupdate',()=>{
+            if(Number.isFinite(jumpVideo.duration)&&jumpVideo.duration>0){
+                const p=(jumpVideo.currentTime/jumpVideo.duration)*100;
+                seekJump.value=p;
+                seekJump.style.setProperty('--progress',p+'%');
+            }
+        });
+        playPauseJumpBtn.onclick=()=>{
+            if(jumpVideo.paused){jumpVideo.play();playPauseJumpBtn.innerText='⏸ Пауза';}
+            else{jumpVideo.pause();playPauseJumpBtn.innerText='▶ Играть';}
+        };
+
+        function keypoint(pose,name){
+            if(!pose||!pose.keypoints)return null;
+            const p=pose.keypoints.find(k=>k.name===name);
+            return p&&((p.score??p.confidence??0)>=0.2)?p:null;
+        }
+        function drawJumpPose(pose){
+            jumpCtx.clearRect(0,0,jumpCanvas.width,jumpCanvas.height);
+            if(!pose||!pose.keypoints)return;
+            const links=[['left_shoulder','right_shoulder'],['left_shoulder','left_elbow'],['left_elbow','left_wrist'],['right_shoulder','right_elbow'],['right_elbow','right_wrist'],['left_shoulder','left_hip'],['right_shoulder','right_hip'],['left_hip','right_hip'],['left_hip','left_knee'],['left_knee','left_ankle'],['right_hip','right_knee'],['right_knee','right_ankle']];
+            jumpCtx.lineWidth=Math.max(3,jumpCanvas.width/220);
+            jumpCtx.strokeStyle='#00e5ff';jumpCtx.fillStyle='#ffcc00';
+            for(const [a,b] of links){
+                const p=keypoint(pose,a),q=keypoint(pose,b);
+                if(p&&q){jumpCtx.beginPath();jumpCtx.moveTo(p.x,p.y);jumpCtx.lineTo(q.x,q.y);jumpCtx.stroke();}
+            }
+            for(const p of pose.keypoints){
+                if((p.score??p.confidence??0)<0.2)continue;
+                jumpCtx.beginPath();jumpCtx.arc(p.x,p.y,Math.max(3,jumpCanvas.width/150),0,Math.PI*2);jumpCtx.fill();
+            }
+        }
+        function getFeetY(pose){
+            const l=keypoint(pose,'left_ankle'),r=keypoint(pose,'right_ankle');
+            if(l&&r)return (l.y+r.y)/2;
+            if(l)return l.y;
+            if(r)return r.y;
+            return null;
+        }
+
+        async function analyzeUploadedJump(){
+            const token=++scanToken;
+            const duration=jumpVideo.duration;
+            if(!Number.isFinite(duration)||duration<=0){
+                statusJump.innerText='Не удалось определить длительность видео.';
+                return;
+            }
+            const sampleRate=12;
+            const totalFrames=Math.max(2,Math.ceil(duration*sampleRate));
+            const samples=[];
+            const originalTime=jumpVideo.currentTime;
+            jumpVideo.pause();
+            let lastPose=null;
+            try{
+                for(let i=0;i<totalFrames;i++){
+                    if(token!==scanToken)return;
+                    const t=Math.min(duration-0.001,i/sampleRate);
+                    if(Math.abs(jumpVideo.currentTime-t)>0.005){
+                        await new Promise(resolve=>{
+                            const done=()=>{jumpVideo.removeEventListener('seeked',done);resolve();};
+                            jumpVideo.addEventListener('seeked',done,{once:true});
+                            jumpVideo.currentTime=t;
+                        });
+                    }
+                    const poses=await jumpModel.estimatePoses(jumpVideo,{maxPoses:1,flipHorizontal:false});
+                    const pose=poses&&poses[0];
+                    const feetY=getFeetY(pose);
+                    const hip=keypoint(pose,'left_hip')&&keypoint(pose,'right_hip')
+                        ?(keypoint(pose,'left_hip').y+keypoint(pose,'right_hip').y)/2
+                        :((keypoint(pose,'left_hip')||keypoint(pose,'right_hip')||{}).y??null);
+                    samples.push({t,feetY,hip,pose,confidence:pose&&pose.keypoints?pose.keypoints.filter(p=>(p.score??p.confidence??0)>=0.25).length:0});
+                    if(pose)lastPose=pose;
+                    if(i%3===0||i===totalFrames-1)
+                        statusJump.innerText='Статус: ИИ анализирует видео… '+Math.round((i+1)/totalFrames*100)+'%';
+                }
+                const valid=samples.filter(s=>s.feetY!==null&&s.confidence>=5);
+                if(valid.length<Math.max(8,totalFrames*0.15)){
+                    statusJump.innerText='Недостаточно уверенно видны стопы/тело. Сними человека целиком сбоку, с хорошим светом, и повтори анализ.';
+                    return;
+                }
+                const sortedFeet=valid.map(s=>s.feetY).sort((a,b)=>a-b);
+                const lowBand=sortedFeet.slice(Math.floor(sortedFeet.length*0.65));
+                const floorY=lowBand.reduce((a,b)=>a+b,0)/lowBand.length;
+                const motion=valid.map(s=>({...s,airborne:floorY-s.feetY>Math.max(8,jumpCanvas.height*0.025)}));
+                let best=null, start=null, airborneCount=0;
+                for(let i=0;i<motion.length;i++){
+                    const s=motion[i];
+                    if(s.airborne){
+                        if(start===null)start=i;
+                        airborneCount++;
+                    }else if(start!==null){
+                        const end=i-1;
+                        const flight=motion[end].t-motion[start].t;
+                        if(flight>=0.12&&flight<=2.0&&(!best||flight>best.flight)){
+                            best={start,end,flight,peak:motion.slice(start,end+1).reduce((a,b)=>b.hip!==null&&(a.hip===null||b.hip<a.hip)?b:a,motion[start])};
+                        }
+                        start=null;airborneCount=0;
+                    }
+                }
+                if(start!==null){
+                    const end=motion.length-1,flight=motion[end].t-motion[start].t;
+                    if(flight>=0.12&&flight<=2.0&&(!best||flight>best.flight))best={start,end,flight,peak:motion.slice(start,end+1).reduce((a,b)=>b.hip!==null&&(a.hip===null||b.hip<a.hip)?b:a,motion[start])};
+                }
+                jumpVideo.currentTime=best?motion[best.start].t:originalTime;
+                if(lastPose)drawJumpPose(lastPose);
+                if(!best){
+                    jumpResultEl.innerText='—';
+                    statusJump.innerText='ИИ просмотрела '+valid.length+' кадров с видимым телом, но не смогла надёжно выделить фазу полёта. Это лучше, чем выдумать высоту. Попробуй ролик, где стопы не закрыты и приземление попадает в кадр.';
+                    return;
+                }
+                const height=9.80665*best.flight*best.flight/8*100;
+                jumpResultEl.innerText=Math.round(height);
+                const method=currentJumpMode==='standing'?'прыжок с места':currentJumpMode==='runup'?'прыжок с разбега':'попытка данка';
+                statusJump.innerText='Анализ завершён ('+method+'). ИИ обнаружила время полёта ≈ '+best.flight.toFixed(2)+' с и оценила высоту ≈ '+Math.round(height)+' см. Это автоматическая оценка по времени полёта, не лабораторное измерение; для разбега/данка точность ниже. Проверь, что видео включает отрыв и приземление.';
+                if(best.peak&&best.peak.pose)drawJumpPose(best.peak.pose);
+            }catch(error){
+                if(token===scanToken)statusJump.innerText='Ошибка анализа: '+(error.message||error)+'. Попробуй MP4 (H.264) и более короткое видео.';
+            }
+        }
+
+        jumpStandBtn.onclick=async function(){
+            try{
+                await ensureJumpModel();
+                statusJump.innerText='ИИ готова. Загрузи видео целиком — анализ начнётся автоматически, вручную калибровать пик не нужно.';
+                jumpGoBtn.disabled=false;
+            }catch(error){statusJump.innerText='Ошибка запуска ИИ: '+(error.message||error);}
+        };
+        jumpGoBtn.onclick=async function(){
+            if(jumpVideo.srcObject){
+                statusJump.innerText='Отслеживаю скелет с камеры. Для точного итогового замера загрузи видео, чтобы ИИ смогла проверить весь прыжок.';
+                isJumping=true;
+                const token=++scanToken;
+                const live=async()=>{
+                    if(!isJumping||token!==scanToken)return;
+                    try{
+                        const poses=await jumpModel.estimatePoses(jumpVideo,{maxPoses:1,flipHorizontal:false});
+                        if(poses&&poses[0])drawJumpPose(poses[0]);
+                    }catch(e){}
+                    if(isJumping&&token===scanToken)requestAnimationFrame(live);
+                };
+                live();
+            }else if(jumpVideo.src){
+                jumpVideo.currentTime=0;
+                jumpVideo.pause();
+                analyzeUploadedJump();
+            }else{
+                statusJump.innerText='Сначала включи камеру или загрузи видео.';
+            }
+        };
         loadProfile();
     </script>
 </body>
