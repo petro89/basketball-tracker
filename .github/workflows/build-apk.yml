@@ -5,6 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Serialize pushes so multiple builds do not try to replace the same release asset at once.
+concurrency:
+  group: basketball-tracker-apk-release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
