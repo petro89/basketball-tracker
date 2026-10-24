@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -25,6 +25,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -40,3 +43,18 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish latest testing APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-apk-latest
+          target_commitish: main
+          name: Basketball Tracker APK — latest test build
+          body: |
+            Installable Android test build of Basketball Tracker.
+            This WebView app currently needs an internet connection to load the tracker and its AI libraries.
+            The APK is debug-signed for testing, not a final Google Play release.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: app/build/outputs/apk/debug/app-debug.apk
