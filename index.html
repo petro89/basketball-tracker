@@ -67,8 +67,12 @@
         #courtHitMode { --glow-color: rgba(40,167,69,0.6); background: linear-gradient(135deg, #28a745, #1e7e34); }
         #courtMissMode { --glow-color: rgba(220,53,69,0.6); background: linear-gradient(135deg, #dc3545, #a71d2a); }
         .court-toolbar button.active-mode { transform: scale(1.05); box-shadow: 0 0 15px var(--glow-color); border: 2px solid white; }
-        .court-canvas { width: 100%; border-radius: 16px; overflow: hidden; position: relative; border: 2px solid rgba(255,255,255,0.1); background: #12121f; pointer-events: auto; cursor: crosshair; }
-        #basketballCourt, #historyBasketballCourt { display: block; width: 100%; height: auto; pointer-events: none; }
+        .court-canvas { width: 100%; max-height: min(430px, 62vh); border-radius: 16px; overflow: auto; overscroll-behavior: contain; position: relative; border: 2px solid rgba(255,255,255,0.1); background: #12121f; pointer-events: auto; cursor: crosshair; touch-action: pan-x pan-y; }
+        #basketballCourt, #historyBasketballCourt { display: block; width: 100%; min-width: 100%; height: auto; pointer-events: none; }
+        .court-zoom-toolbar { display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 10px; }
+        .court-zoom-toolbar button { min-width:42px; padding:8px 12px; font-size:16px; border-radius:12px; background:linear-gradient(135deg,#343447,#202030); border:1px solid rgba(255,255,255,.18); }
+        #courtZoomValue { min-width:48px; color:#ff9500; font-size:12px; font-weight:800; text-align:center; }
+        #courtZoomReset { font-size:10px !important; padding:9px 10px !important; color:rgba(255,255,255,.85); }
         .court-line { stroke: rgba(255,255,255,0.9); stroke-width: 3; fill: none; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255,255,255,0.3)); }
         .court-arc { stroke: rgba(255,255,255,0.9); stroke-width: 3; fill: none; stroke-dasharray: 6,6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(255,255,255,0.3)); }
         .court-backboard { fill: rgba(255,255,255,0.05); stroke: #a67b5b; stroke-width: 4; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
@@ -137,6 +141,12 @@
                 <div class="court-toolbar">
                     <button id="courtHitMode" class="active-mode">Попал</button>
                     <button id="courtMissMode">Мимо</button>
+                </div>
+                <div class="court-zoom-toolbar" aria-label="Масштаб карты бросков">
+                    <button id="courtZoomOut" type="button" aria-label="Уменьшить карту">−</button>
+                    <span id="courtZoomValue" aria-live="polite">100%</span>
+                    <button id="courtZoomIn" type="button" aria-label="Увеличить карту">＋</button>
+                    <button id="courtZoomReset" type="button">Сброс масштаба</button>
                 </div>
                 <div class="court-canvas" id="courtCanvas">
                     <svg id="basketballCourt" viewBox="0 0 300 220">
@@ -301,6 +311,18 @@
             const historySvg=svg.cloneNode(true);
             historySvg.id='historyBasketballCourt';
             historySvg.querySelectorAll('.shot-marker,.shot-text').forEach(el=>el.remove());
+            // Give the saved map its own solid wood surface. A cloned SVG can resolve
+            // duplicate gradient IDs against the live map and render its floor black.
+            const historyWood=historySvg.querySelector('.court-wood');
+            if(historyWood) {
+                historyWood.classList.remove('court-wood');
+                historyWood.setAttribute('fill','#c99a62');
+                historyWood.style.setProperty('fill','#c99a62','important');
+            }
+            historySvg.querySelectorAll('.court-wood-line').forEach(line=>{
+                line.style.stroke='rgba(104,61,28,.28)';
+                line.style.strokeWidth='1.2';
+            });
             for(const point of pointEntries) {
                 const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
                 circle.setAttribute('class','shot-marker');
@@ -335,10 +357,51 @@
         document.getElementById('sessionViewer').addEventListener('click',event=>{if(event.target.id==='sessionViewer')closeShootingSession();});
         document.addEventListener('keydown',event=>{if(event.key==='Escape')closeShootingSession();});
         function animateBall() { const icon = document.querySelector('#hitBtn .basketball-icon'); if (!icon) return; icon.classList.remove('spin-animation'); setTimeout(() => { icon.classList.add('spin-animation'); }, 10); }
-        const courtCanvas=document.getElementById('courtCanvas'); const svg=document.getElementById('basketballCourt'); let courtMode='hit'; const courtMapData={};
+        const courtCanvas=document.getElementById('courtCanvas');
+        const svg=document.getElementById('basketballCourt');
+        let courtMode='hit';
+        let courtZoom=1;
+        const courtMapData={};
+        const courtZoomValue=document.getElementById('courtZoomValue');
+        function applyCourtZoom(nextZoom) {
+            const oldZoom=courtZoom;
+            const centerX=(courtCanvas.scrollLeft+courtCanvas.clientWidth/2)/oldZoom;
+            const centerY=(courtCanvas.scrollTop+courtCanvas.clientHeight/2)/oldZoom;
+            courtZoom=Math.max(1,Math.min(2.5,Math.round(nextZoom*4)/4));
+            svg.style.width=(courtZoom*100)+'%';
+            svg.style.minWidth='100%';
+            courtZoomValue.textContent=Math.round(courtZoom*100)+'%';
+            requestAnimationFrame(()=>{
+                courtCanvas.scrollLeft=Math.max(0,centerX*courtZoom-courtCanvas.clientWidth/2);
+                courtCanvas.scrollTop=Math.max(0,centerY*courtZoom-courtCanvas.clientHeight/2);
+            });
+        }
+        document.getElementById('courtZoomOut').addEventListener('click',()=>applyCourtZoom(courtZoom-.25));
+        document.getElementById('courtZoomIn').addEventListener('click',()=>applyCourtZoom(courtZoom+.25));
+        document.getElementById('courtZoomReset').addEventListener('click',()=>{
+            applyCourtZoom(1);
+            requestAnimationFrame(()=>{courtCanvas.scrollLeft=0;courtCanvas.scrollTop=0;});
+        });
         document.getElementById('courtHitMode').onclick=()=>{courtMode='hit'; document.getElementById('courtHitMode').classList.add('active-mode'); document.getElementById('courtMissMode').classList.remove('active-mode');};
         document.getElementById('courtMissMode').onclick=()=>{courtMode='miss'; document.getElementById('courtMissMode').classList.add('active-mode'); document.getElementById('courtHitMode').classList.remove('active-mode');};
-        courtCanvas.addEventListener('click', function(e) { const rect=courtCanvas.getBoundingClientRect(); const scaleX=300/rect.width; const scaleY=220/rect.height; const x=(e.clientX-rect.left)*scaleX; const y=(e.clientY-rect.top)*scaleY; if (x >= 10 && x <= 290 && y >= 20 && y <= 200) { const gridX=Math.round(x/6)*6; const gridY=Math.round(y/6)*6; const key=`${gridX}-${gridY}`; if(!courtMapData[key]) courtMapData[key]={hits:0,misses:0}; if(courtMode==='hit') { courtMapData[key].hits++; hits++; total++; } else { courtMapData[key].misses++; total++; } updateStats(); renderCourtMap(); } });
+        courtCanvas.addEventListener('click', function(e) {
+            // Convert screen coordinates using the actual SVG bounds, not the
+            // scroll viewport, so zooming never shifts the selected shot location.
+            const rect=svg.getBoundingClientRect();
+            if(!rect.width||!rect.height) return;
+            const x=(e.clientX-rect.left)*300/rect.width;
+            const y=(e.clientY-rect.top)*220/rect.height;
+            if(x>=10&&x<=290&&y>=20&&y<=200) {
+                const gridX=Math.max(10,Math.min(290,Math.round(x/6)*6));
+                const gridY=Math.max(20,Math.min(200,Math.round(y/6)*6));
+                const key=`${gridX}-${gridY}`;
+                if(!courtMapData[key]) courtMapData[key]={hits:0,misses:0};
+                if(courtMode==='hit') { courtMapData[key].hits++; hits++; total++; }
+                else { courtMapData[key].misses++; total++; }
+                updateStats();
+                renderCourtMap();
+            }
+        });
         function renderCourtMap() {
             svg.querySelectorAll('.shot-marker,.shot-text').forEach(el=>el.remove());
             for(const key in courtMapData) {
