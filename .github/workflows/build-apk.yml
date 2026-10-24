@@ -69,16 +69,12 @@ jobs:
           retention-days: 30
 
       - name: Publish latest testing APK
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-apk-latest
-          target_commitish: main
-          name: Basketball Tracker APK — latest test build
-          body: |
-            Installable Android test build of Basketball Tracker.
-            This WebView app currently needs an internet connection to load the tracker and its AI libraries.
-            The APK is debug-signed for testing, not a final Google Play release.
-          prerelease: true
-          make_latest: false
-          overwrite_files: true
-          files: app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view android-apk-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit android-apk-latest               --repo "$GITHUB_REPOSITORY"               --title "Basketball Tracker APK — latest test build"               --notes "Installable Android test build of Basketball Tracker. Internet is currently required to load the tracker and its AI libraries. Debug-signed for testing; not a final Google Play release."
+          else
+            gh release create android-apk-latest               app/build/outputs/apk/debug/app-debug.apk               --repo "$GITHUB_REPOSITORY"               --target main               --prerelease               --title "Basketball Tracker APK — latest test build"               --notes "Installable Android test build of Basketball Tracker. Internet is currently required to load the tracker and its AI libraries. Debug-signed for testing; not a final Google Play release."
+          fi
+          gh release upload android-apk-latest app/build/outputs/apk/debug/app-debug.apk             --repo "$GITHUB_REPOSITORY"             --clobber
