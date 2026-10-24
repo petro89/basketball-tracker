@@ -16,6 +16,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate tracker JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+          const inlineScripts = scripts.filter(([, attrs, body]) => !/\bsrc\s*=/.test(attrs) && body.trim());
+          if (!inlineScripts.length) throw new Error('No inline JavaScript found in index.html');
+          for (let i = 0; i < inlineScripts.length; i++) {
+            try {
+              new Function(inlineScripts[i][2]);
+            } catch (error) {
+              console.error('index.html inline script ' + (i + 1) + ': ' + error.message);
+              process.exit(1);
+            }
+          }
+          console.log('index.html: ' + inlineScripts.length + ' inline script(s) passed syntax validation');
+          NODE
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
